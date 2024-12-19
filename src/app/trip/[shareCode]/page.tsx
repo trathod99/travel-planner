@@ -10,6 +10,7 @@ import { CopyShareLink } from '@/components/CopyShareLink';
 import { PhoneAuth } from '@/components/PhoneAuth';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { TripRSVP } from '@/components/TripRSVP';
 
 interface PageProps {
   params: Promise<{ shareCode: string }>;
@@ -110,6 +111,11 @@ export default function TripPage({ params }: PageProps) {
           )}
         </CardContent>
       </Card>
+      
+      <TripRSVP 
+        tripId={trip.shareCode} 
+        userPhone={userData.phoneNumber}
+      />
     </div>
   );
 } 
