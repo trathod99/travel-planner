@@ -12,7 +12,12 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useState } from 'react';
 import { PhoneAuth } from './PhoneAuth';
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { 
+  Dialog, 
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 export function Navbar() {
@@ -75,10 +80,10 @@ export function Navbar() {
 
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
         <DialogContent className="sm:max-w-md">
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Log In</h2>
-            <PhoneAuth onAuthSuccess={handleAuthSuccess} />
-          </div>
+          <DialogHeader>
+            <DialogTitle>Log In or Sign Up</DialogTitle>
+          </DialogHeader>
+          <PhoneAuth onAuthSuccess={handleAuthSuccess} />
         </DialogContent>
       </Dialog>
     </>

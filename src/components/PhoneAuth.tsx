@@ -22,168 +22,232 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
   const [stage, setStage] = useState<'phone' | 'verify' | 'name'>('phone');
   const [userName, setUserName] = useState('');
   const [needsName, setNeedsName] = useState(false);
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   const { createOrFetchUser, initializeNewUser, saveUserName } = useUserManagement();
 
   useEffect(() => {
-    // Initialize reCAPTCHA when component mounts
-    if (!recaptchaVerifierRef.current && recaptchaContainerRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-        size: 'normal',
-        callback: () => {
-          // reCAPTCHA solved, allow signInWithPhoneNumber.
-        },
-        'expired-callback': () => {
-          // Response expired. Ask user to solve reCAPTCHA again.
-          alert('reCAPTCHA expired. Please try again.')
-        }
-      })
+    // Initialize invisible reCAPTCHA when component mounts
+    if (!recaptchaVerifierRef.current) {
+      try {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'sign-in-button', {
+          size: 'invisible',
+          callback: () => {
+            // reCAPTCHA solved
+          },
+          'expired-callback': () => {
+            toast({
+              title: "reCAPTCHA expired",
+              description: "Please try again.",
+              variant: "destructive",
+            });
+            setIsLoading(false);
+          }
+        });
+      } catch (error) {
+        console.error('Error initializing reCAPTCHA:', error);
+      }
     }
 
     // Cleanup function
     return () => {
       if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear()
-        recaptchaVerifierRef.current = null
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (error) {
+          console.error('Error clearing reCAPTCHA:', error);
+        }
+        recaptchaVerifierRef.current = null;
       }
-    }
-  }, [])
+    };
+  }, [toast]);
 
   const handleSendCode = async () => {
-    try {
-      // Check if user exists and needs name
-      const existingUser = await createOrFetchUser(phoneNumber);
-      setNeedsName(!existingUser || !existingUser.name);
-
-      if (!recaptchaVerifierRef.current) {
-        throw new Error('reCAPTCHA not initialized');
-      }
-
-      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-      const confirmationResult = await signInWithPhoneNumber(
-        auth, 
-        formattedPhoneNumber, 
-        recaptchaVerifierRef.current
-      );
-      
-      window.confirmationResult = confirmationResult;
-      setStage('verify');
-    } catch (error) {
-      console.error('Error sending verification code:', error);
+    if (!phoneNumber) {
       toast({
-        title: "Error",
-        description: "Failed to send verification code. Please try again.",
+        title: "Phone number required",
+        description: "Please enter your phone number.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Format phone number to E.164 format
+      const formattedPhone = phoneNumber.startsWith('+')
+        ? phoneNumber
+        : `+1${phoneNumber.replace(/\D/g, '')}`;
+
+      // Create new reCAPTCHA verifier if it doesn't exist
+      if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'sign-in-button', {
+          size: 'invisible',
+        });
+      }
+
+      const confirmationResult = await signInWithPhoneNumber(
+        auth,
+        formattedPhone,
+        recaptchaVerifierRef.current
+      );
+
+      window.confirmationResult = confirmationResult;
+      setStage('verify');
+      toast({
+        title: "Code sent!",
+        description: "Please check your phone for the verification code.",
+      });
+    } catch (error: any) {
+      console.error('Error sending code:', error);
+      // Clear the reCAPTCHA if there's an error
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+          recaptchaVerifierRef.current = null;
+        } catch (clearError) {
+          console.error('Error clearing reCAPTCHA:', clearError);
+        }
+      }
+      toast({
+        title: "Error sending code",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleVerifyCode = async () => {
-    try {
-      if (!window.confirmationResult) {
-        throw new Error('No confirmation result found');
-      }
-      
-      const result = await window.confirmationResult.confirm(verificationCode);
-      if (result.user) {
-        const existingUser = await createOrFetchUser(phoneNumber);
-
-        if (!existingUser) {
-          await initializeNewUser(phoneNumber);
-        }
-
-        toast({
-          title: "Successfully verified!",
-          description: "You have been logged in successfully.",
-          variant: "default",
-        });
-
-        // If user needs to set name, show name stage
-        if (needsName) {
-          setStage('name');
-        } else {
-          // Otherwise proceed with success handlers
-          if (onAuthSuccess) {
-            onAuthSuccess();
-          } else if (redirectPath) {
-            window.location.href = redirectPath;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error verifying code:', error);
+    if (!verificationCode) {
       toast({
-        title: "Verification failed",
-        description: "Invalid verification code. Please try again.",
+        title: "Verification code required",
+        description: "Please enter the code sent to your phone.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await window.confirmationResult.confirm(verificationCode);
+      const user = result.user;
+
+      // Check if user exists in our database
+      const existingUser = await createOrFetchUser(user.phoneNumber!);
+      if (!existingUser) {
+        setNeedsName(true);
+        setStage('name');
+      } else {
+        handleAuthenticationSuccess();
+      }
+    } catch (error: any) {
+      console.error('Error verifying code:', error);
+      toast({
+        title: "Invalid code",
+        description: "Please check the code and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleNameSave = async () => {
-    try {
-      await saveUserName(userName);
+  const handleSetName = async () => {
+    if (!userName) {
       toast({
-        title: "Name saved!",
-        description: "Your profile has been updated.",
-        variant: "default",
-      });
-      
-      // After saving name, proceed with success handlers
-      if (onAuthSuccess) {
-        onAuthSuccess();
-      } else if (redirectPath) {
-        window.location.href = redirectPath;
-      }
-    } catch (error) {
-      console.error('Error saving name:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save name. Please try again.",
+        title: "Name required",
+        description: "Please enter your name.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await saveUserName(userName);
+      handleAuthenticationSuccess();
+    } catch (error: any) {
+      console.error('Error saving name:', error);
+      toast({
+        title: "Error saving name",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAuthenticationSuccess = () => {
+    if (onAuthSuccess) {
+      onAuthSuccess();
+    }
+    if (redirectPath) {
+      router.push(redirectPath);
     }
   };
 
   return (
     <div className="space-y-4">
       {stage === 'phone' && (
-        <>
-          <Input 
-            type="tel" 
-            placeholder="Enter phone number (e.g., +1234567890)" 
+        <div className="space-y-4">
+          <Input
+            type="tel"
+            placeholder="Enter your phone number"
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
+            disabled={isLoading}
           />
-          <div ref={recaptchaContainerRef}></div>
-          <Button onClick={handleSendCode}>Send Code</Button>
-        </>
+          <Button 
+            id="sign-in-button"
+            onClick={handleSendCode}
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? "Sending..." : "Send Code"}
+          </Button>
+        </div>
       )}
-      
+
       {stage === 'verify' && (
-        <>
+        <div className="space-y-4">
           <Input
             type="text"
             placeholder="Enter verification code"
             value={verificationCode}
             onChange={(e) => setVerificationCode(e.target.value)}
+            disabled={isLoading}
           />
-          <Button onClick={handleVerifyCode}>Verify Code</Button>
-        </>
+          <Button 
+            onClick={handleVerifyCode}
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? "Verifying..." : "Verify Code"}
+          </Button>
+        </div>
       )}
 
-      {stage === 'name' && needsName && (
-        <>
-          <Input 
+      {stage === 'name' && (
+        <div className="space-y-4">
+          <Input
             type="text"
             placeholder="Enter your name"
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
+            disabled={isLoading}
           />
-          <Button onClick={handleNameSave}>Save Name</Button>
-        </>
+          <Button 
+            onClick={handleSetName}
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? "Saving..." : "Save Name"}
+          </Button>
+        </div>
       )}
     </div>
   );
