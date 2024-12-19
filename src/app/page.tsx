@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { PhoneAuth } from '@/components/PhoneAuth';
+import { CreateTripForm } from '@/components/CreateTripForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Home() {
@@ -9,10 +8,10 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Phone Authentication</CardTitle>
+          <CardTitle>Create a New Trip</CardTitle>
         </CardHeader>
         <CardContent>
-          <PhoneAuth />
+          <CreateTripForm />
         </CardContent>
       </Card>
     </main>
