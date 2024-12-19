@@ -1,29 +1,29 @@
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useState, useRef, useEffect } from 'react'
-import { auth } from '@/lib/firebase/clientApp'
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth'
-import { useToast } from "@/hooks/use-toast"
-import { useUserManagement } from '@/hooks/useUserManagement'
+'use client';
 
-export function PhoneAuth() {
-  const { toast } = useToast()
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [verificationCode, setVerificationCode] = useState('')
-  const [showVerificationInput, setShowVerificationInput] = useState(false)
-  const [userName, setUserName] = useState('')
-  const [stage, setStage] = useState<'phone' | 'verify' | 'name'>('phone')
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null)
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null)
+import { useState, useRef, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { auth } from '@/lib/firebase/clientApp';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { useToast } from "@/hooks/use-toast";
+import { useUserManagement } from '@/hooks/useUserManagement';
+import { useRouter } from 'next/navigation';
 
-  const { 
-    userData, 
-    isNewUser, 
-    createOrFetchUser, 
-    saveUserName, 
-    initializeNewUser,
-    handleLogout 
-  } = useUserManagement()
+interface PhoneAuthProps {
+  redirectPath?: string;
+  onAuthSuccess?: () => void;
+}
+
+export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [stage, setStage] = useState<'phone' | 'verify'>('phone');
+  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+
+  const { createOrFetchUser, initializeNewUser } = useUserManagement();
 
   useEffect(() => {
     // Initialize reCAPTCHA when component mounts
@@ -80,74 +80,38 @@ export function PhoneAuth() {
   const handleVerifyCode = async () => {
     try {
       if (!window.confirmationResult) {
-        throw new Error('No confirmation result found')
+        throw new Error('No confirmation result found');
       }
       
-      const result = await window.confirmationResult.confirm(verificationCode)
+      const result = await window.confirmationResult.confirm(verificationCode);
       if (result.user) {
         // Check if user exists in database
-        const existingUser = await createOrFetchUser(phoneNumber)
+        const existingUser = await createOrFetchUser(phoneNumber);
 
-        if (existingUser) {
-          // Existing user - populate name if exists
-          setUserName(existingUser.name || '')
-        } else {
+        if (!existingUser) {
           // New user - initialize in database
-          await initializeNewUser(phoneNumber)
+          await initializeNewUser(phoneNumber);
         }
 
-        setStage('name')
         toast({
           title: "Successfully verified!",
           description: "You have been logged in successfully.",
           variant: "default",
-        })
+        });
+        
+        // Handle success callback or redirect
+        if (onAuthSuccess) {
+          onAuthSuccess();
+        } else if (redirectPath) {
+          // Force a full page reload when redirecting
+          window.location.href = redirectPath;
+        }
       }
     } catch (error) {
-      console.error('Error verifying code:', error)
+      console.error('Error verifying code:', error);
       toast({
         title: "Verification failed",
         description: "Invalid verification code. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleNameSave = async () => {
-    try {
-      await saveUserName(userName)
-      toast({
-        title: "Success",
-        description: "Name saved successfully!",
-        variant: "default",
-      })
-    } catch (error) {
-      console.error('Error saving name:', error)
-      toast({
-        title: "Error",
-        description: "Failed to save name. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleLogoutClick = async () => {
-    try {
-      await handleLogout();
-      setStage('phone');
-      setPhoneNumber('');
-      setVerificationCode('');
-      setUserName('');
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-        variant: "default",
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to log out. Please try again.",
         variant: "destructive",
       });
     }
@@ -179,31 +143,8 @@ export function PhoneAuth() {
           <Button onClick={handleVerifyCode}>Verify Code</Button>
         </>
       )}
-
-      {stage === 'name' && (
-        <>
-          <Input 
-            type="text" 
-            placeholder="Enter your name" 
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-          />
-          <div className="space-y-2">
-            <Button onClick={handleNameSave}>
-              {isNewUser ? 'Save Name' : 'Update Name'}
-            </Button>
-            <Button 
-              onClick={handleLogoutClick}
-              variant="destructive"
-              className="w-full"
-            >
-              Logout
-            </Button>
-          </div>
-        </>
-      )}
     </div>
-  )
+  );
 }
 
 // Add type declaration for window

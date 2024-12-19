@@ -9,11 +9,15 @@ import { useToast } from '@/hooks/use-toast';
 import { database } from '@/lib/firebase/clientApp';
 import { ref, set } from 'firebase/database';
 import { generateShareCode } from '@/utils/generateShareCode';
+import { PhoneAuth } from './PhoneAuth';
+import { useUserManagement } from '@/hooks/useUserManagement';
 
 export function CreateTripForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+  const [shareCode, setShareCode] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -22,33 +26,30 @@ export function CreateTripForm() {
     description: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setIsLoading(true);
-
     try {
-      const shareCode = await generateShareCode(formData.name, database);
+      // Generate share code and store trip data first
+      const newShareCode = await generateShareCode(formData.name);
+      setShareCode(newShareCode);
+      
       const tripData = {
         ...formData,
-        id: shareCode,
-        shareCode,
+        id: newShareCode,
+        shareCode: newShareCode,
         createdAt: new Date().toISOString(),
       };
 
-      const tripRef = ref(database, `trips/${shareCode}`);
+      const tripRef = ref(database, `trips/${newShareCode}`);
       await set(tripRef, tripData);
 
-      toast({
-        title: "Trip Created!",
-        description: "Your trip has been created successfully.",
-      });
-
-      router.push(`/trip/${shareCode}`);
+      // Show phone auth after trip is created
+      setShowPhoneAuth(true);
     } catch (error) {
-      console.error('Error creating trip:', error);
+      console.error('Error preparing trip:', error);
       toast({
         title: "Error",
-        description: "Failed to create trip. Please try again.",
+        description: "Failed to prepare trip. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -56,8 +57,28 @@ export function CreateTripForm() {
     }
   };
 
+  const handleAuthSuccess = () => {
+    if (!shareCode) return;
+    
+    toast({
+      title: "Trip Created!",
+      description: "Your trip has been created successfully.",
+    });
+    
+    router.push(`/trip/${shareCode}`);
+  };
+
+  if (showPhoneAuth) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold mb-4">Verify Your Phone to View Trip</h2>
+        <PhoneAuth onAuthSuccess={handleAuthSuccess} />
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
       <Input
         required
         type="text"
@@ -96,7 +117,11 @@ export function CreateTripForm() {
         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
       />
       
-      <Button type="submit" disabled={isLoading} className="w-full">
+      <Button 
+        onClick={handleSubmit} 
+        disabled={isLoading || !formData.name || !formData.location || !formData.startDate || !formData.endDate}
+        className="w-full"
+      >
         {isLoading ? "Creating..." : "Create Trip"}
       </Button>
     </form>
