@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { database } from '@/lib/firebase/clientApp';
-import { ref, set, onValue } from 'firebase/database';
+import { ref, set, onValue, get } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -11,9 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useUserManagement } from '@/hooks/useUserManagement';
 
 interface RSVPData {
   phoneNumber: string;
+  name?: string | null;
   status: 'going' | 'maybe' | 'not_going';
   updatedAt: string;
 }
@@ -23,17 +25,37 @@ interface TripRSVPProps {
   userPhone: string;
 }
 
+interface UserDetails {
+  phoneNumber: string;
+  name: string | null;
+}
+
 export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
   const { toast } = useToast();
+  const { userData } = useUserManagement();
   const [rsvpStatus, setRsvpStatus] = useState<string>('');
   const [allRSVPs, setAllRSVPs] = useState<RSVPData[]>([]);
+  const [userDetails, setUserDetails] = useState<Record<string, UserDetails>>({});
 
   useEffect(() => {
     const rsvpsRef = ref(database, `trip-rsvps/${tripId}`);
-    const unsubscribe = onValue(rsvpsRef, (snapshot) => {
+    const unsubscribe = onValue(rsvpsRef, async (snapshot) => {
       if (snapshot.exists()) {
         const rsvps = Object.values(snapshot.val()) as RSVPData[];
         setAllRSVPs(rsvps);
+        
+        // Fetch user details for all RSVPs
+        const userDetailsMap: Record<string, UserDetails> = {};
+        await Promise.all(
+          rsvps.map(async (rsvp) => {
+            const userRef = ref(database, `users/${rsvp.phoneNumber.replace(/[^0-9]/g, '')}`);
+            const userSnapshot = await get(userRef);
+            if (userSnapshot.exists()) {
+              userDetailsMap[rsvp.phoneNumber] = userSnapshot.val();
+            }
+          })
+        );
+        setUserDetails(userDetailsMap);
         
         // Find user's RSVP
         const userRSVP = rsvps.find(rsvp => rsvp.phoneNumber === userPhone);
@@ -43,16 +65,14 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
       }
     });
 
-    return () => {
-      // Clean up subscription
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [tripId, userPhone]);
 
   const handleRSVPChange = async (newStatus: string) => {
     try {
       const rsvpData: RSVPData = {
         phoneNumber: userPhone,
+        name: userData?.name,
         status: newStatus as RSVPData['status'],
         updatedAt: new Date().toISOString(),
       };
@@ -102,7 +122,9 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
                 className="flex justify-between items-center py-2 px-4 bg-gray-50 rounded-md"
               >
                 <span className="text-sm">
-                  {rsvp.phoneNumber === userPhone ? 'You' : rsvp.phoneNumber}
+                  {rsvp.phoneNumber === userPhone ? 
+                    'You' : 
+                    (userDetails[rsvp.phoneNumber]?.name || 'Guest')}
                 </span>
                 <span className={`text-sm font-medium ${
                   rsvp.status === 'going' ? 'text-green-600' :

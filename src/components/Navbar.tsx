@@ -23,7 +23,7 @@ export function Navbar() {
           {userData && (
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
-                Welcome, {userData.phoneNumber}
+                Welcome, {userData.name || 'Guest'}
               </span>
               <Button 
                 variant="ghost" 

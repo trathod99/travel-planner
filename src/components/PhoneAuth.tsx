@@ -19,11 +19,13 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [stage, setStage] = useState<'phone' | 'verify'>('phone');
+  const [stage, setStage] = useState<'phone' | 'verify' | 'name'>('phone');
+  const [userName, setUserName] = useState('');
+  const [needsName, setNeedsName] = useState(false);
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  const { createOrFetchUser, initializeNewUser } = useUserManagement();
+  const { createOrFetchUser, initializeNewUser, saveUserName } = useUserManagement();
 
   useEffect(() => {
     // Initialize reCAPTCHA when component mounts
@@ -51,31 +53,32 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
 
   const handleSendCode = async () => {
     try {
-      // Check if user exists before sending verification
-      await createOrFetchUser(phoneNumber)
+      // Check if user exists and needs name
+      const existingUser = await createOrFetchUser(phoneNumber);
+      setNeedsName(!existingUser || !existingUser.name);
 
       if (!recaptchaVerifierRef.current) {
-        throw new Error('reCAPTCHA not initialized')
+        throw new Error('reCAPTCHA not initialized');
       }
 
-      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
+      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
       const confirmationResult = await signInWithPhoneNumber(
         auth, 
         formattedPhoneNumber, 
         recaptchaVerifierRef.current
-      )
+      );
       
-      window.confirmationResult = confirmationResult
-      setStage('verify')
+      window.confirmationResult = confirmationResult;
+      setStage('verify');
     } catch (error) {
-      console.error('Error sending verification code:', error)
+      console.error('Error sending verification code:', error);
       toast({
         title: "Error",
         description: "Failed to send verification code. Please try again.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const handleVerifyCode = async () => {
     try {
@@ -85,11 +88,9 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
       
       const result = await window.confirmationResult.confirm(verificationCode);
       if (result.user) {
-        // Check if user exists in database
         const existingUser = await createOrFetchUser(phoneNumber);
 
         if (!existingUser) {
-          // New user - initialize in database
           await initializeNewUser(phoneNumber);
         }
 
@@ -98,13 +99,17 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
           description: "You have been logged in successfully.",
           variant: "default",
         });
-        
-        // Handle success callback or redirect
-        if (onAuthSuccess) {
-          onAuthSuccess();
-        } else if (redirectPath) {
-          // Force a full page reload when redirecting
-          window.location.href = redirectPath;
+
+        // If user needs to set name, show name stage
+        if (needsName) {
+          setStage('name');
+        } else {
+          // Otherwise proceed with success handlers
+          if (onAuthSuccess) {
+            onAuthSuccess();
+          } else if (redirectPath) {
+            window.location.href = redirectPath;
+          }
         }
       }
     } catch (error) {
@@ -112,6 +117,31 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
       toast({
         title: "Verification failed",
         description: "Invalid verification code. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleNameSave = async () => {
+    try {
+      await saveUserName(userName);
+      toast({
+        title: "Name saved!",
+        description: "Your profile has been updated.",
+        variant: "default",
+      });
+      
+      // After saving name, proceed with success handlers
+      if (onAuthSuccess) {
+        onAuthSuccess();
+      } else if (redirectPath) {
+        window.location.href = redirectPath;
+      }
+    } catch (error) {
+      console.error('Error saving name:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save name. Please try again.",
         variant: "destructive",
       });
     }
@@ -141,6 +171,18 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
             onChange={(e) => setVerificationCode(e.target.value)}
           />
           <Button onClick={handleVerifyCode}>Verify Code</Button>
+        </>
+      )}
+
+      {stage === 'name' && needsName && (
+        <>
+          <Input 
+            type="text"
+            placeholder="Enter your name"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+          />
+          <Button onClick={handleNameSave}>Save Name</Button>
         </>
       )}
     </div>
