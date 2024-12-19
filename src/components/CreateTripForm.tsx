@@ -70,7 +70,7 @@ export function CreateTripForm() {
 
   if (showPhoneAuth) {
     return (
-      <div className="space-y-4">
+      <div className="w-full space-y-4">
         <h2 className="text-lg font-semibold mb-4">Verify Your Phone to View Trip</h2>
         <PhoneAuth onAuthSuccess={handleAuthSuccess} />
       </div>
@@ -78,49 +78,68 @@ export function CreateTripForm() {
   }
 
   return (
-    <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-      <Input
-        required
-        type="text"
-        placeholder="Trip Name"
-        value={formData.name}
-        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-      />
-      
-      <Input
-        required
-        type="text"
-        placeholder="Location"
-        value={formData.location}
-        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-      />
-      
-      <div className="grid grid-cols-2 gap-4">
+    <form onSubmit={(e) => e.preventDefault()} className="w-full space-y-6">
+      <div className="space-y-4">
         <Input
           required
-          type="date"
-          value={formData.startDate}
-          onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+          type="text"
+          placeholder="Trip Name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
         />
         
         <Input
           required
-          type="date"
-          value={formData.endDate}
-          onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+          type="text"
+          placeholder="Location"
+          value={formData.location}
+          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
         />
+        
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 space-y-2">
+            <label htmlFor="startDate" className="text-sm text-gray-600">
+              Start Date (optional)
+            </label>
+            <Input
+              id="startDate"
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+            />
+          </div>
+          
+          <div className="flex-1 space-y-2">
+            <label htmlFor="endDate" className="text-sm text-gray-600">
+              End Date (optional)
+            </label>
+            <Input
+              id="endDate"
+              type="date"
+              value={formData.endDate}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+            />
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <label htmlFor="description" className="text-sm text-gray-600">
+            Description (optional)
+          </label>
+          <Textarea
+            id="description"
+            placeholder="Add any additional details about the trip..."
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="min-h-[100px]"
+          />
+        </div>
       </div>
-      
-      <Textarea
-        placeholder="Description (optional)"
-        value={formData.description}
-        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-      />
       
       <Button 
         onClick={handleSubmit} 
-        disabled={isLoading || !formData.name || !formData.location || !formData.startDate || !formData.endDate}
-        className="w-full"
+        disabled={isLoading || !formData.name || !formData.location}
+        className="w-full py-6"
       >
         {isLoading ? "Creating..." : "Create Trip"}
       </Button>

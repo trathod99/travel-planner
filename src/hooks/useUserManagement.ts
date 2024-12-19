@@ -12,23 +12,50 @@ interface UserData {
 export function useUserManagement() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check for existing auth on mount
   useEffect(() => {
+    setIsLoading(true);
+    
+    // First check cookies
     const savedUserData = Cookies.get('userData');
     if (savedUserData) {
-      setUserData(JSON.parse(savedUserData));
+      try {
+        const parsedUserData = JSON.parse(savedUserData);
+        setUserData(parsedUserData);
+      } catch (error) {
+        console.error('Error parsing saved user data:', error);
+        Cookies.remove('userData');
+      }
     }
 
-    // Listen for auth state changes
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    // Then listen for auth state changes
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
         setUserData(null);
         Cookies.remove('userData');
+      } else if (!userData) {
+        // If we have auth but no userData, try to fetch it
+        try {
+          const userRef = ref(database, `users/${user.phoneNumber?.replace(/[^0-9]/g, '')}`);
+          const snapshot = await get(userRef);
+          if (snapshot.exists()) {
+            const fetchedUserData = snapshot.val();
+            setUserData(fetchedUserData);
+            Cookies.set('userData', JSON.stringify(fetchedUserData), { expires: 7 });
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
       }
+      setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      setIsLoading(false);
+    };
   }, []);
 
   const createOrFetchUser = async (phoneNumber: string) => {
@@ -88,6 +115,7 @@ export function useUserManagement() {
   return {
     userData,
     isNewUser,
+    isLoading,
     createOrFetchUser,
     saveUserName,
     initializeNewUser,

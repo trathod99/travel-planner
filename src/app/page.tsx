@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <Card className="w-full max-w-md">
+    <main className="container mx-auto px-4 py-8 md:py-12">
+      <Card className="w-full max-w-3xl mx-auto">
         <CardHeader>
           <CardTitle>Create a New Trip</CardTitle>
         </CardHeader>
