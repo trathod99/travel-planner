@@ -4,34 +4,19 @@ import { CopyShareLink } from '@/components/CopyShareLink';
 import { TripRSVP } from '@/components/TripRSVP';
 import { InlineEdit } from './InlineEdit';
 import { database } from '@/lib/firebase/clientApp';
-import { ref, update, get } from 'firebase/database';
+import { ref, update } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { useState, useEffect } from 'react';
+import { useTripUpdate } from '@/contexts/TripUpdateContext';
 
 interface TripOverviewProps {
   trip: Trip;
   userPhone: string;
 }
 
-export function TripOverview({ trip: initialTrip, userPhone }: TripOverviewProps) {
+export function TripOverview({ trip, userPhone }: TripOverviewProps) {
   const { toast } = useToast();
-  const [trip, setTrip] = useState(initialTrip);
-
-  // Fetch latest trip data when component mounts or when switching to the tab
-  useEffect(() => {
-    async function fetchLatestTripData() {
-      const tripRef = ref(database, `trips/${initialTrip.shareCode}`);
-      const snapshot = await get(tripRef);
-      
-      if (snapshot.exists()) {
-        const latestTrip = snapshot.val();
-        setTrip(latestTrip);
-      }
-    }
-
-    fetchLatestTripData();
-  }, [initialTrip.shareCode]); // Re-run when shareCode changes
+  const { triggerUpdate } = useTripUpdate();
 
   const handleSave = async (field: keyof Trip, value: string) => {
     try {
@@ -41,16 +26,12 @@ export function TripOverview({ trip: initialTrip, userPhone }: TripOverviewProps
         updatedValue = `${value}T12:00:00.000Z`;
       }
 
-      // Update database first
+      // Update database
       const tripRef = ref(database, `trips/${trip.shareCode}`);
       await update(tripRef, { [field]: updatedValue });
 
-      // Fetch the latest trip data after update
-      const snapshot = await get(tripRef);
-      if (snapshot.exists()) {
-        const latestTrip = snapshot.val();
-        setTrip(latestTrip);
-      }
+      // Trigger update to refresh parent state
+      await triggerUpdate();
       
       toast({
         title: "Changes saved",

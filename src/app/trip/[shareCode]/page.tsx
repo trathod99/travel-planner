@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TripOverview } from '@/components/TripOverview';
 import { TripItinerary } from '@/components/TripItinerary';
+import { TripUpdateProvider } from '@/contexts/TripUpdateContext';
 
 interface PageProps {
   params: Promise<{ shareCode: string }>;
@@ -25,18 +26,20 @@ export default function TripPage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const { userData } = useUserManagement();
 
-  useEffect(() => {
-    async function fetchTrip() {
-      const tripRef = ref(database, `trips/${shareCode}`);
-      const snapshot = await get(tripRef);
-      
-      if (snapshot.exists()) {
-        setTrip(snapshot.val());
-      }
-      setIsLoading(false);
+  // Function to fetch latest trip data
+  const fetchLatestTrip = async () => {
+    const tripRef = ref(database, `trips/${shareCode}`);
+    const snapshot = await get(tripRef);
+    
+    if (snapshot.exists()) {
+      setTrip(snapshot.val());
     }
+    setIsLoading(false);
+  };
 
-    fetchTrip();
+  // Initial fetch
+  useEffect(() => {
+    fetchLatestTrip();
   }, [shareCode]);
 
   if (isLoading) {
@@ -68,20 +71,25 @@ export default function TripPage({ params }: PageProps) {
   // Show trip details once authenticated
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview">
-          <TripOverview trip={trip} userPhone={userData.phoneNumber} />
-        </TabsContent>
-        
-        <TabsContent value="itinerary">
-          <TripItinerary trip={trip} />
-        </TabsContent>
-      </Tabs>
+      <TripUpdateProvider onUpdate={fetchLatestTrip}>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overview">
+            <TripOverview 
+              trip={trip} 
+              userPhone={userData.phoneNumber} 
+            />
+          </TabsContent>
+          
+          <TabsContent value="itinerary">
+            <TripItinerary trip={trip} />
+          </TabsContent>
+        </Tabs>
+      </TripUpdateProvider>
     </div>
   );
 } 
