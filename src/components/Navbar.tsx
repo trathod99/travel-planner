@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import {
@@ -19,6 +18,7 @@ import {
   DialogHeader,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { TripPicker } from './TripPicker';
 
 export function Navbar() {
   const router = useRouter();
@@ -38,14 +38,7 @@ export function Navbar() {
       <nav className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <div>
-              <Link 
-                href="/" 
-                className="text-lg font-semibold hover:text-gray-600 transition-colors"
-              >
-                Home
-              </Link>
-            </div>
+            <TripPicker />
             
             {userData ? (
               <DropdownMenu>
