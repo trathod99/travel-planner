@@ -1,3 +1,12 @@
+export interface ItineraryItem {
+  id: string;
+  name: string;
+  startTime: string; // ISO string
+  endTime: string; // ISO string
+  description?: string;
+  order: number;
+}
+
 export interface Trip {
   id: string;
   name: string;
@@ -7,4 +16,5 @@ export interface Trip {
   description?: string;
   createdAt: string;
   shareCode: string;
+  itinerary?: Record<string, Record<string, ItineraryItem>>; // dateString -> Record of items
 } 
