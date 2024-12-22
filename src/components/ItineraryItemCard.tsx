@@ -18,16 +18,18 @@ export function ItineraryItemCard({ item, onEdit }: ItineraryItemCardProps) {
 
   return (
     <Card 
-      className="hover:shadow-md transition-shadow cursor-pointer h-full"
+      className="hover:shadow-md transition-shadow cursor-pointer h-full overflow-hidden"
       onClick={() => onEdit(item)}
     >
-      <CardContent className="p-3 h-full flex flex-col">
-        <h3 className="font-medium text-sm">{item.name}</h3>
+      <CardContent className="p-3 h-full flex flex-col overflow-hidden">
+        <h3 className="font-medium text-sm">
+          {item.name}
+        </h3>
         <p className="text-xs text-muted-foreground mt-1">
           {formatTime(item.startTime)} - {formatTime(item.endTime)}
         </p>
         {item.description && (
-          <p className="text-xs text-muted-foreground mt-1 flex-1 overflow-y-auto">
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
             {item.description}
           </p>
         )}

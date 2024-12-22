@@ -146,6 +146,28 @@ export function TripItinerary({ trip }: TripItineraryProps) {
     }
   };
 
+  const handleDeleteItem = async (item: ItineraryItem) => {
+    try {
+      const updates: Record<string, any> = {};
+      updates[`trips/${trip.shareCode}/itinerary/${dateString}/${item.id}`] = null;
+      
+      await update(ref(database), updates);
+      await triggerUpdate();
+      
+      toast({
+        title: "Item deleted",
+        description: "Itinerary item has been deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete item. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Sticky date selector */}
@@ -237,6 +259,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
           selectedDate={selectedDate}
           editItem={editingItem}
           onAdd={handleEditItem}
+          onDelete={handleDeleteItem}
           open={true}
           onOpenChange={(open) => !open && setEditingItem(null)}
         />
