@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { format } from 'date-fns';
 import {
@@ -43,6 +43,23 @@ export function AddItineraryItemDialog({
     description: '',
   });
 
+  // For debouncing and handling race conditions
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastProcessedRef = useRef<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   // Set form data when editing an item or when defaultHour changes
   useEffect(() => {
     if (editItem) {
@@ -73,23 +90,50 @@ export function AddItineraryItemDialog({
   const handleQuickAddChange = async (value: string) => {
     setFormData(prev => ({ ...prev, quickAdd: value }));
     
-    // Process with AI if the input is substantial and ends with punctuation or has been idle
-    if (value.length > 10) {
+    // Clear any pending timeouts
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current);
+      processingTimeoutRef.current = null;
+    }
+
+    // Cancel any in-flight requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Only process if input is substantial and different from last processed
+    if (value.length > 5 && value !== lastProcessedRef.current) {
       setIsProcessing(true);
-      try {
-        const processed = await processQuickAdd(value);
-        setFormData(prev => ({
-          ...prev,
-          name: processed.title,
-          startTime: processed.startTime,
-          endTime: processed.endTime,
-          description: processed.description,
-        }));
-      } catch (error) {
-        console.error('Error processing quick add:', error);
-      } finally {
-        setIsProcessing(false);
-      }
+
+      // Set up new timeout for debouncing
+      processingTimeoutRef.current = setTimeout(async () => {
+        try {
+          // Create new abort controller for this request
+          abortControllerRef.current = new AbortController();
+          lastProcessedRef.current = value;
+
+          const processed = await processQuickAdd(value);
+          
+          // Only update if this is still the latest request
+          if (value === lastProcessedRef.current) {
+            setFormData(prev => ({
+              ...prev,
+              name: processed.title,
+              startTime: processed.startTime,
+              endTime: processed.endTime,
+              description: processed.description,
+            }));
+          }
+        } catch (error: any) {
+          // Only log if not aborted
+          if (error?.name !== 'AbortError') {
+            console.error('Error processing quick add:', error);
+          }
+        } finally {
+          setIsProcessing(false);
+        }
+      }, 1500); // 1.5 second delay
     }
   };
 
