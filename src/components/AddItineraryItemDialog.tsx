@@ -12,8 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ItineraryItem } from '@/types/trip';
 import { processQuickAdd } from '@/lib/ai/processQuickAdd';
+import { processAttachment } from '@/lib/ai/processAttachment';
 import { uploadAttachment, deleteAttachment, FileUploadResult } from '@/lib/firebase/storage';
-import { Loader2, Trash2, Paperclip, X } from 'lucide-react';
+import { Loader2, Trash2, Paperclip, X, FileImage, FileText, FileVideo, Sparkles } from 'lucide-react';
+import { toast } from "@/components/ui/use-toast";
+import { uploadFile } from '@/hooks/useFileUpload';
 
 interface AddItineraryItemDialogProps {
   selectedDate: Date;
@@ -24,6 +27,35 @@ interface AddItineraryItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tripId: string;
+}
+
+function AttachmentThumbnail({ type, url }: { type: string; url: string }) {
+  if (type.startsWith('image/')) {
+    return (
+      <div className="w-8 h-8 rounded overflow-hidden bg-muted">
+        <img 
+          src={url} 
+          alt="" 
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  if (type.startsWith('video/')) {
+    return <FileVideo className="w-8 h-8 text-blue-500" />;
+  }
+
+  if (type === 'application/pdf') {
+    return <FileText className="w-8 h-8 text-red-500" />;
+  }
+
+  return <Paperclip className="w-8 h-8 text-gray-500" />;
+}
+
+interface AttachmentWithFile extends FileUploadResult {
+  file?: File;
+  isProcessing?: boolean;
 }
 
 export function AddItineraryItemDialog({ 
@@ -38,7 +70,7 @@ export function AddItineraryItemDialog({
 }: AddItineraryItemDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [attachments, setAttachments] = useState<FileUploadResult[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentWithFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     quickAdd: '',
@@ -65,36 +97,52 @@ export function AddItineraryItemDialog({
     };
   }, []);
 
-  // Set form data and attachments when editing
+  // Reset form when dialog opens/closes
   useEffect(() => {
-    if (editItem) {
-      const startTime = editItem.startTime.split('T')[1].substring(0, 5);
-      const endTime = editItem.endTime.split('T')[1].substring(0, 5);
-      
+    if (open) {
+      if (editItem) {
+        const startTime = editItem.startTime.split('T')[1].substring(0, 5);
+        const endTime = editItem.endTime.split('T')[1].substring(0, 5);
+        
+        setFormData({
+          quickAdd: '',
+          name: editItem.name,
+          startTime,
+          endTime,
+          description: editItem.description || '',
+        });
+
+        if (editItem.attachments) {
+          setAttachments(editItem.attachments);
+        }
+      } else if (defaultHour !== undefined) {
+        const defaultStart = `${defaultHour.toString().padStart(2, '0')}:00`;
+        const defaultEnd = `${(defaultHour + 1).toString().padStart(2, '0')}:00`;
+        
+        setFormData({
+          quickAdd: '',
+          name: '',
+          startTime: defaultStart,
+          endTime: defaultEnd,
+          description: '',
+        });
+        setAttachments([]);
+      }
+    } else {
+      // Reset form when dialog closes
       setFormData({
         quickAdd: '',
-        name: editItem.name,
-        startTime,
-        endTime,
-        description: editItem.description || '',
+        name: '',
+        startTime: '',
+        endTime: '',
+        description: '',
       });
-
-      if (editItem.attachments) {
-        setAttachments(editItem.attachments);
-      }
-    } else if (defaultHour !== undefined) {
-      const defaultStart = `${defaultHour.toString().padStart(2, '0')}:00`;
-      const defaultEnd = `${(defaultHour + 1).toString().padStart(2, '0')}:00`;
-      
-      setFormData(prev => ({
-        ...prev,
-        startTime: defaultStart,
-        endTime: defaultEnd,
-      }));
+      setAttachments([]);
     }
-  }, [editItem, defaultHour]);
+  }, [open, editItem, defaultHour]);
 
-  const handleQuickAddChange = async (value: string) => {
+  const handleQuickAddChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
     setFormData(prev => ({ ...prev, quickAdd: value }));
     
     // Clear any pending timeouts
@@ -120,7 +168,7 @@ export function AddItineraryItemDialog({
           abortControllerRef.current = new AbortController();
           lastProcessedRef.current = value;
 
-          const processed = await processQuickAdd(value);
+          const processed = await processQuickAdd(value, "");
           
           // Only update if this is still the latest request
           if (value === lastProcessedRef.current) {
@@ -144,28 +192,60 @@ export function AddItineraryItemDialog({
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files?.length) return;
-
-    setIsLoading(true);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    
     try {
-      const itemId = editItem?.id || nanoid();
-      const newAttachments = await Promise.all(
-        Array.from(files).map(file => uploadAttachment(file, tripId, itemId))
+      const file = e.target.files[0];
+      const attachment = await uploadFile(
+        file, 
+        tripId, 
+        editItem?.id || 'new'
       );
       
-      setAttachments(prev => [...prev, ...newAttachments]);
+      setAttachments(prev => [...prev, attachment]);
+      
+      toast({
+        title: "File uploaded",
+        description: "Click the sparkles icon to analyze the file contents.",
+      });
     } catch (error) {
-      console.error('Error uploading files:', error);
-      if (error instanceof Error && error.message.includes('10MB')) {
-        // Show toast or alert about file size limit
-      }
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload file. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAnalyzeAttachment = async (attachment: AttachmentWithFile) => {
+    if (!attachment.file || attachment.isProcessing) return;
+
+    try {
+      setAttachments(prev => 
+        prev.map(a => a.url === attachment.url ? { ...a, isProcessing: true } : a)
+      );
+
+      const analysis = await processAttachment(
+        attachment.file,
+        formData.name || editItem?.name || '',
+        formData.description || editItem?.description
+      );
+
+      // Add the analysis to the description
+      const currentDescription = formData.description || '';
+      const separator = currentDescription ? '\n\n' : '';
+      setFormData(prev => ({
+        ...prev,
+        description: currentDescription + separator + analysis
+      }));
+    } catch (error) {
+      console.error('Error analyzing attachment:', error);
     } finally {
-      setIsLoading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setAttachments(prev => 
+        prev.map(a => a.url === attachment.url ? { ...a, isProcessing: false } : a)
+      );
     }
   };
 
@@ -241,7 +321,7 @@ export function AddItineraryItemDialog({
               <Input
                 id="quickAdd"
                 value={formData.quickAdd}
-                onChange={(e) => handleQuickAddChange(e.target.value)}
+                onChange={handleQuickAddChange}
                 placeholder="e.g. Lunch at Sushi Roku at 12:30pm"
                 autoFocus
               />
@@ -320,23 +400,41 @@ export function AddItineraryItemDialog({
                     className="flex items-center gap-2 flex-1 min-w-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Paperclip className="h-4 w-4 shrink-0" />
+                    <AttachmentThumbnail type={attachment.type} url={attachment.url} />
                     <span className="text-sm truncate">
                       {attachment.name}
                     </span>
                   </a>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveAttachment(attachment);
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {attachment.file && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleAnalyzeAttachment(attachment)}
+                        disabled={attachment.isProcessing}
+                      >
+                        {attachment.isProcessing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveAttachment(attachment);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -345,7 +443,7 @@ export function AddItineraryItemDialog({
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                onChange={handleFileSelect}
+                onChange={handleFileUpload}
                 accept="image/*,application/pdf,video/*"
                 multiple
               />
