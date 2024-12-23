@@ -5,6 +5,12 @@ export interface ItineraryItem {
   endTime: string; // ISO string
   description?: string;
   order: number;
+  attachments?: {
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+  }[];
 }
 
 export interface Trip {

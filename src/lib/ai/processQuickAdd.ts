@@ -18,7 +18,7 @@ export async function processQuickAdd(input: string): Promise<ProcessedItem> {
   - title: a concise title prefixed with a relevant emoji
   - startTime: the start time in HH:mm 24-hour format (e.g., "14:30")
   - endTime: the end time in HH:mm 24-hour format (e.g., "15:30")
-  - description: a brief description with any relevant details
+  - description: a fun, helpful description of the itinerary item
 
   If times aren't specified, make reasonable assumptions. For example:
   - Meals typically last 1-1.5 hours

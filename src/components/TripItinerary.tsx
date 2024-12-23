@@ -251,6 +251,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
           onAdd={handleAddItem}
           open={true}
           onOpenChange={(open) => !open && setAddingForHour(null)}
+          tripId={trip.shareCode}
         />
       )}
 
@@ -262,6 +263,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
           onDelete={handleDeleteItem}
           open={true}
           onOpenChange={(open) => !open && setEditingItem(null)}
+          tripId={trip.shareCode}
         />
       )}
     </div>

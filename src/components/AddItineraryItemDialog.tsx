@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ItineraryItem } from '@/types/trip';
 import { processQuickAdd } from '@/lib/ai/processQuickAdd';
-import { Loader2, Trash2 } from 'lucide-react';
+import { uploadAttachment, deleteAttachment, FileUploadResult } from '@/lib/firebase/storage';
+import { Loader2, Trash2, Paperclip, X } from 'lucide-react';
 
 interface AddItineraryItemDialogProps {
   selectedDate: Date;
@@ -22,6 +23,7 @@ interface AddItineraryItemDialogProps {
   editItem?: ItineraryItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  tripId: string;
 }
 
 export function AddItineraryItemDialog({ 
@@ -32,9 +34,12 @@ export function AddItineraryItemDialog({
   editItem,
   open,
   onOpenChange,
+  tripId,
 }: AddItineraryItemDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [attachments, setAttachments] = useState<FileUploadResult[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     quickAdd: '',
     name: '',
@@ -60,10 +65,9 @@ export function AddItineraryItemDialog({
     };
   }, []);
 
-  // Set form data when editing an item or when defaultHour changes
+  // Set form data and attachments when editing
   useEffect(() => {
     if (editItem) {
-      // Extract time from the ISO string (which is stored as local time)
       const startTime = editItem.startTime.split('T')[1].substring(0, 5);
       const endTime = editItem.endTime.split('T')[1].substring(0, 5);
       
@@ -74,8 +78,11 @@ export function AddItineraryItemDialog({
         endTime,
         description: editItem.description || '',
       });
+
+      if (editItem.attachments) {
+        setAttachments(editItem.attachments);
+      }
     } else if (defaultHour !== undefined) {
-      // Format default times
       const defaultStart = `${defaultHour.toString().padStart(2, '0')}:00`;
       const defaultEnd = `${(defaultHour + 1).toString().padStart(2, '0')}:00`;
       
@@ -137,6 +144,40 @@ export function AddItineraryItemDialog({
     }
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+
+    setIsLoading(true);
+    try {
+      const itemId = editItem?.id || nanoid();
+      const newAttachments = await Promise.all(
+        Array.from(files).map(file => uploadAttachment(file, tripId, itemId))
+      );
+      
+      setAttachments(prev => [...prev, ...newAttachments]);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      if (error instanceof Error && error.message.includes('10MB')) {
+        // Show toast or alert about file size limit
+      }
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveAttachment = async (attachment: FileUploadResult) => {
+    try {
+      await deleteAttachment(attachment.url);
+      setAttachments(prev => prev.filter(a => a.url !== attachment.url));
+    } catch (error) {
+      console.error('Error removing attachment:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -150,6 +191,7 @@ export function AddItineraryItemDialog({
         endTime: `${dateString}T${formData.endTime || '10:00'}:00.000Z`,
         description: formData.description,
         order: editItem?.order || Date.now(),
+        attachments: attachments.length > 0 ? attachments : undefined,
       };
 
       await onAdd(itemData);
@@ -161,6 +203,7 @@ export function AddItineraryItemDialog({
         endTime: '',
         description: '',
       });
+      setAttachments([]);
     } catch (error) {
       console.error('Error saving itinerary item:', error);
     } finally {
@@ -257,6 +300,66 @@ export function AddItineraryItemDialog({
               placeholder="Add a description"
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              Attachments
+              <span className="text-xs text-muted-foreground">(max 10MB)</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((attachment) => (
+                <div 
+                  key={attachment.url}
+                  className="flex items-center gap-2 bg-muted p-2 rounded-md group hover:bg-muted/80"
+                >
+                  <a 
+                    href={attachment.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 flex-1 min-w-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Paperclip className="h-4 w-4 shrink-0" />
+                    <span className="text-sm truncate">
+                      {attachment.name}
+                    </span>
+                  </a>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveAttachment(attachment);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileSelect}
+                accept="image/*,application/pdf,video/*"
+                multiple
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+              >
+                <Paperclip className="h-4 w-4 mr-2" />
+                Add File
+              </Button>
+            </div>
           </div>
 
           <div className="flex justify-between items-center gap-3">
