@@ -68,8 +68,8 @@ export async function getFileContent(file: File): Promise<string> {
 
 export async function processAttachment(
   file: File,
-  itemName: string,
-  itemDescription?: string
+  currentTitle: string,
+  currentDescription: string | undefined
 ): Promise<string> {
   const fileContent = await getFileContent(file);
   console.log('File type:', file.type);
@@ -89,19 +89,21 @@ export async function processAttachment(
               source: {
                 type: 'base64',
                 media_type: 'image/jpeg',
-                data: fileContent.split(',')[1] // Remove the data URL prefix
+                data: fileContent.split(',')[1]
               }
             },
             {
               type: 'text',
-              text: `Please analyze this image carefully. It's related to a travel itinerary item named "${itemName}". Extract ALL relevant travel information you can find, such as confirmation numbers, dates, times, locations, contact details, prices, and any special instructions.
+              text: `Please analyze this image carefully. Extract ONLY the information you are highly confident about. Return your response in this exact JSON format:
 
-Format your response like this:
-"AI found the following details:
-• [Category]: [Details]
-..."
+{
+  "Title": "descriptive title - for flights: 'Flight LAX→SFO', for hotels: 'Marriott Downtown SF', for activities: 'Museum of Modern Art Tour'",
+  "Start Time": "time in HH:mm format (24h), or null if unclear",
+  "End Time": "time in HH:mm format (24h), or null if unclear",
+  "Description": "STRING. Do not nest JSON objects. Provide adetailed description including confirmation numbers, locations, contact info, etc. Use bullet points to aid with readability"
+}
 
-Be thorough - include ALL relevant details you can find. If truly no relevant information is found, only then say "No relevant information found in the attachment."`
+Only include fields where you are highly confident about the information. Use null for uncertain fields. For the title, be as specific as possible while keeping it concise. For description, you can include less certain but potentially useful details.`
             }
           ]
         }]
@@ -121,28 +123,14 @@ Be thorough - include ALL relevant details you can find. If truly no relevant in
         temperature: 0.2,
         messages: [{
           role: 'user',
-          content: `You are a helpful AI assistant analyzing a file attachment for a travel itinerary item.
+          content: `Please analyze this ${file.type} file carefully. Extract ONLY the information you are highly confident about. Format your response EXACTLY like this, with each field on a new line:
 
-Current Itinerary Item:
-Name: ${itemName}
-${itemDescription ? `Current Description: ${itemDescription}\n` : ''}
+Title: [descriptive title including key details - for flights: "Flight LAX→SFO", for hotels: "Marriott Downtown SF", for activities: "Museum of Modern Art Tour"]
+Start Time: [time in HH:mm format (24h), or leave blank if unclear]
+End Time: [time in HH:mm format (24h), or leave blank if unclear]
+Description: [detailed description including all relevant details like confirmation numbers, locations, contact info, etc.]
 
-I've attached a ${file.type} file that contains travel-related information. Please analyze it carefully and extract ALL helpful information that could enhance the itinerary item description. Pay special attention to:
-
-1. Confirmation/Booking Numbers
-2. Exact Times and Dates
-3. Location Details (addresses, terminals, etc.)
-4. Contact Information
-5. Important Instructions
-6. Pricing Information
-7. Any Special Requirements or Notes
-
-Format your response like this:
-"AI found the following details:
-• [Category]: [Details]
-..."
-
-Be thorough - include ALL relevant details you can find. If truly no relevant information is found, only then say "No relevant information found in the attachment."
+Only include fields where you are highly confident about the information. Leave fields blank if you're unsure. For the title, be as specific as possible while keeping it concise.
 
 Content to analyze:
 ${fileContent}`

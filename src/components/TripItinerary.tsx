@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, Upload } from 'lucide-react';
 import { TripDateSelector } from './TripDateSelector';
 import { AddItineraryItemDialog } from './AddItineraryItemDialog';
 import { ItineraryItemCard } from './ItineraryItemCard';
@@ -10,6 +10,8 @@ import { database } from '@/lib/firebase/clientApp';
 import { ref, update } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import { useTripUpdate } from '@/contexts/TripUpdateContext';
+import { uploadFile } from '@/hooks/useFileUpload';
+import { processAttachment } from '@/lib/ai/processAttachment';
 
 interface TripItineraryProps {
   trip: Trip;
@@ -26,8 +28,10 @@ export function TripItinerary({ trip }: TripItineraryProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(trip.startDate));
   const [addingForHour, setAddingForHour] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
   const { triggerUpdate } = useTripUpdate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dateString = format(selectedDate, 'yyyy-MM-dd');
 
@@ -168,16 +172,125 @@ export function TripItinerary({ trip }: TripItineraryProps) {
     }
   };
 
+  const handleSmartUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    setIsAnalyzing(true);
+    
+    try {
+      const file = e.target.files[0];
+      
+      // First upload the file
+      const attachment = await uploadFile(
+        file,
+        trip.shareCode,
+        'new'
+      );
+
+      // Show loading dialog
+      toast({
+        title: "Analyzing file...",
+        description: "Please wait while we extract the details.",
+      });
+
+      // Then analyze it
+      const analysisResponse = await processAttachment(
+        file,
+        '',
+        ''
+      );
+
+      // Remove all newlines and extra spaces from the response
+      const cleanedResponse = analysisResponse.replace(/\s+/g, ' ').trim();
+      console.log('Cleaned response:', cleanedResponse);
+      
+      // Parse the JSON response
+      const analysis = JSON.parse(cleanedResponse);
+      console.log('Parsed analysis:', analysis);
+
+      // Open the add item dialog with pre-populated data
+      setAddingForHour(new Date().getHours());
+      
+      // Wait for the next tick to ensure the dialog is open
+      setTimeout(() => {
+        const event = new CustomEvent('smart-upload', {
+          detail: {
+            name: analysis.Title || '',
+            startTime: analysis["Start Time"] || '',
+            endTime: analysis["End Time"] || '',
+            description: analysis.Description || '',
+            attachments: [attachment]
+          }
+        });
+        window.dispatchEvent(event);
+      }, 100);
+
+      toast({
+        title: "Analysis complete",
+        description: "Details extracted and ready for review.",
+      });
+    } catch (error) {
+      console.error('Error processing file:', error);
+      toast({
+        title: "Analysis failed",
+        description: "Failed to analyze file. Please try again or add details manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Sticky date selector */}
+      {/* Sticky date selector and actions */}
       <div className="sticky top-4 z-10 bg-background">
-        <TripDateSelector
-          startDate={new Date(trip.startDate)}
-          endDate={new Date(trip.endDate)}
-          selectedDate={selectedDate}
-          onDateSelect={setSelectedDate}
-        />
+        <div className="flex flex-col gap-4">
+          <TripDateSelector
+            startDate={new Date(trip.startDate)}
+            endDate={new Date(trip.endDate)}
+            selectedDate={selectedDate}
+            onDateSelect={setSelectedDate}
+          />
+          
+          {/* Desktop action buttons */}
+          <div className="hidden md:flex gap-2 justify-end">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleSmartUpload}
+              accept="image/*,application/pdf"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2 animate-pulse" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Smart Upload
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setAddingForHour(new Date().getHours())}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="relative">
@@ -235,14 +348,29 @@ export function TripItinerary({ trip }: TripItineraryProps) {
         </div>
       </div>
 
-      {/* Floating action button for mobile */}
-      <Button
-        size="lg"
-        className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-lg md:hidden flex items-center justify-center"
-        onClick={() => setAddingForHour(new Date().getHours())}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {/* Mobile action buttons */}
+      <div className="fixed bottom-6 right-6 flex flex-col gap-2 md:hidden">
+        <Button
+          size="lg"
+          variant="outline"
+          className="rounded-full w-14 h-14 shadow-lg flex items-center justify-center"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isAnalyzing}
+        >
+          {isAnalyzing ? (
+            <Sparkles className="h-6 w-6 animate-pulse" />
+          ) : (
+            <Sparkles className="h-6 w-6" />
+          )}
+        </Button>
+        <Button
+          size="lg"
+          className="rounded-full w-14 h-14 shadow-lg flex items-center justify-center"
+          onClick={() => setAddingForHour(new Date().getHours())}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
 
       {addingForHour !== null && (
         <AddItineraryItemDialog

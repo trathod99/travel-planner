@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ItineraryItem } from '@/types/trip';
 import { processQuickAdd } from '@/lib/ai/processQuickAdd';
 import { processAttachment } from '@/lib/ai/processAttachment';
-import { uploadAttachment, deleteAttachment, FileUploadResult } from '@/lib/firebase/storage';
+import { uploadAttachment, deleteAttachment, FileUploadResult, getAttachmentDownloadUrl } from '@/lib/firebase/storage';
 import { Loader2, Trash2, Paperclip, X, FileImage, FileText, FileVideo, Sparkles } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
 import { uploadFile } from '@/hooks/useFileUpload';
@@ -112,18 +112,29 @@ export function AddItineraryItemDialog({
           description: editItem.description || '',
         });
 
-        if (editItem.attachments) {
-          setAttachments(editItem.attachments);
-        }
-      } else if (defaultHour !== undefined) {
-        const defaultStart = `${defaultHour.toString().padStart(2, '0')}:00`;
-        const defaultEnd = `${(defaultHour + 1).toString().padStart(2, '0')}:00`;
-        
+        // Validate attachments when loading
+        const validateAttachments = async () => {
+          const validAttachments = [];
+          if (editItem.attachments) {
+            for (const attachment of editItem.attachments) {
+              try {
+                // Try to get the download URL to verify the file exists
+                await getAttachmentDownloadUrl(attachment.path);
+                validAttachments.push(attachment);
+              } catch (error) {
+                console.warn('Attachment not found:', attachment.name);
+              }
+            }
+          }
+          setAttachments(validAttachments as AttachmentWithFile[]);
+        };
+        validateAttachments();
+      } else {
         setFormData({
           quickAdd: '',
           name: '',
-          startTime: defaultStart,
-          endTime: defaultEnd,
+          startTime: '',
+          endTime: '',
           description: '',
         });
         setAttachments([]);
@@ -139,7 +150,33 @@ export function AddItineraryItemDialog({
       });
       setAttachments([]);
     }
-  }, [open, editItem, defaultHour]);
+  }, [open, editItem]);
+
+  // Listen for smart upload events
+  useEffect(() => {
+    const handleSmartUpload = (e: CustomEvent) => {
+      const { name, startTime, endTime, description, attachments } = e.detail;
+      console.log('Smart upload event received:', e.detail); // Debug log
+      
+      // Directly set form data with the AI analysis results
+      setFormData({
+        quickAdd: '',
+        name: name || '',
+        startTime: startTime || '',
+        endTime: endTime || '',
+        description: description || '',
+      });
+
+      if (attachments) {
+        setAttachments(attachments);
+      }
+    };
+
+    window.addEventListener('smart-upload', handleSmartUpload as EventListener);
+    return () => {
+      window.removeEventListener('smart-upload', handleSmartUpload as EventListener);
+    };
+  }, []);
 
   const handleQuickAddChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -233,15 +270,35 @@ export function AddItineraryItemDialog({
         formData.description || editItem?.description
       );
 
-      // Add the analysis to the description
-      const currentDescription = formData.description || '';
-      const separator = currentDescription ? '\n\n' : '';
-      setFormData(prev => ({
-        ...prev,
-        description: currentDescription + separator + analysis
-      }));
+      console.log('AI Response:', analysis); // Debug log
+      const parsedData = JSON.parse(analysis);
+      console.log('Parsed Data:', parsedData); // Debug log
+
+      // Immediately update form with AI response data
+      const updatedFormData = {
+        ...formData,
+        name: parsedData.Title || formData.name,
+        startTime: parsedData["Start Time"] || formData.startTime,
+        endTime: parsedData["End Time"] || formData.endTime,
+        description: formData.description 
+          ? `${formData.description}\n\n${parsedData.Description}` 
+          : parsedData.Description
+      };
+      
+      console.log('Updating form with:', updatedFormData); // Debug log
+      setFormData(updatedFormData);
+
+      toast({
+        title: "Analysis complete",
+        description: "Details extracted and added to the form.",
+      });
     } catch (error) {
       console.error('Error analyzing attachment:', error);
+      toast({
+        title: "Analysis failed",
+        description: "Failed to analyze file. Please try again or enter details manually.",
+        variant: "destructive",
+      });
     } finally {
       setAttachments(prev => 
         prev.map(a => a.url === attachment.url ? { ...a, isProcessing: false } : a)

@@ -10,6 +10,7 @@ export interface ItineraryItem {
     url: string;
     type: string;
     size: number;
+    path: string;
   }[];
 }
 

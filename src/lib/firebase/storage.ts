@@ -8,6 +8,7 @@ export interface FileUploadResult {
   url: string;
   type: string;
   size: number;
+  path: string;
 }
 
 export async function uploadAttachment(
@@ -15,40 +16,60 @@ export async function uploadAttachment(
   tripId: string,
   itemId: string
 ): Promise<FileUploadResult> {
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error('File size exceeds 10MB limit');
-  }
-
-  // Create a reference to the file location
-  const fileName = `${Date.now()}-${file.name}`;
-  const filePath = `trip-attachments/${tripId}/${itemId}/${fileName}`;
-  const fileRef = ref(storage, filePath);
-
   try {
-    // Upload the file
-    const snapshot = await uploadBytes(fileRef, file);
+    const timestamp = Date.now();
+    const filename = `${timestamp}-${file.name}`;
+    const path = `trips/${tripId}/attachments/${filename}`;
+    const storageRef = ref(storage, path);
     
-    // Get the download URL
-    const url = await getDownloadURL(fileRef);
-
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    
     return {
-      name: file.name,
       url,
+      name: file.name,
       type: file.type,
       size: file.size,
+      path, // Store the path for later use
     };
   } catch (error) {
-    console.error('Error uploading file:', error);
-    throw error;
+    console.error('Error uploading attachment:', error);
+    throw new Error('Failed to upload file. Please check your permissions and try again.');
   }
 }
 
-export async function deleteAttachment(url: string): Promise<void> {
+export async function deleteAttachment(path: string): Promise<void> {
   try {
-    const fileRef = ref(storage, url);
+    const fileRef = ref(storage, path);
     await deleteObject(fileRef);
   } catch (error) {
-    console.error('Error deleting file:', error);
-    throw error;
+    console.error('Error deleting attachment:', error);
+    throw new Error('Failed to delete file. Please try again.');
+  }
+}
+
+export async function getAttachmentDownloadUrl(path: string): Promise<string> {
+  try {
+    // If it's already a download URL, extract the path
+    if (path.includes('firebasestorage.googleapis.com')) {
+      const pathMatch = path.match(/o\/(.*?)\?/);
+      if (pathMatch) {
+        path = decodeURIComponent(pathMatch[1]);
+      }
+    }
+    
+    const fileRef = ref(storage, path);
+    const url = await getDownloadURL(fileRef);
+    
+    // Add token and alt=media to ensure proper access
+    const urlObj = new URL(url);
+    if (!urlObj.searchParams.has('alt')) {
+      urlObj.searchParams.append('alt', 'media');
+    }
+    
+    return urlObj.toString();
+  } catch (error) {
+    console.error('Error getting download URL:', error);
+    throw new Error('Failed to access file. Please try again.');
   }
 } 
