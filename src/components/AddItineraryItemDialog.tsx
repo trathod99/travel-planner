@@ -91,7 +91,7 @@ export function AddItineraryItemDialog({
     startTime: '',
     endTime: '',
     description: '',
-    category: editItem?.category || 'Activity' as const
+    category: editItem?.category || 'None'
   });
 
   // For debouncing and handling race conditions
@@ -132,7 +132,7 @@ export function AddItineraryItemDialog({
           startTime: defaultHour ? `${defaultHour.toString().padStart(2, '0')}:00` : '',
           endTime: defaultHour ? `${(defaultHour + 1).toString().padStart(2, '0')}:00` : '',
           description: '',
-          category: 'Activity'
+          category: 'None'
         });
         setAttachments([]);
       }
@@ -144,7 +144,7 @@ export function AddItineraryItemDialog({
         startTime: '',
         endTime: '',
         description: '',
-        category: 'Activity'
+        category: 'None'
       });
       setAttachments([]);
     }
@@ -356,6 +356,7 @@ export function AddItineraryItemDialog({
 
     try {
       const dateString = format(selectedDate, 'yyyy-MM-dd');
+      
       const itemData: ItineraryItem = {
         id: editItem?.id || nanoid(),
         name: formData.name || 'Untitled Item',
@@ -488,7 +489,7 @@ export function AddItineraryItemDialog({
             </label>
             <Select
               value={formData.category}
-              onValueChange={(value: 'Travel' | 'Food' | 'Accommodation' | 'Activity') => 
+              onValueChange={(value: 'None' | 'Travel' | 'Food' | 'Accommodation' | 'Activity') => 
                 setFormData(prev => ({ ...prev, category: value }))
               }
             >
@@ -496,6 +497,7 @@ export function AddItineraryItemDialog({
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="None">None</SelectItem>
                 <SelectItem value="Travel">Travel</SelectItem>
                 <SelectItem value="Food">Food</SelectItem>
                 <SelectItem value="Accommodation">Accommodation</SelectItem>

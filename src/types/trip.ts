@@ -9,7 +9,7 @@ export interface ItineraryItem {
     phoneNumber: string;
     name: string | null;
   };
-  category: 'Travel' | 'Food' | 'Accommodation' | 'Activity';
+  category: 'None' | 'Travel' | 'Food' | 'Accommodation' | 'Activity';
   attachments?: {
     name: string;
     url: string;
