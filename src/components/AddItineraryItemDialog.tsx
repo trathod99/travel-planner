@@ -14,7 +14,7 @@ import { ItineraryItem } from '@/types/trip';
 import { processQuickAdd } from '@/lib/ai/processQuickAdd';
 import { processAttachment } from '@/lib/ai/processAttachment';
 import { uploadAttachment, deleteAttachment, FileUploadResult, getAttachmentDownloadUrl } from '@/lib/firebase/storage';
-import { Loader2, Trash2, Paperclip, X, FileImage, FileText, FileVideo, Sparkles } from 'lucide-react';
+import { Loader2, Trash2, Paperclip, X, FileImage, FileText, FileVideo, Sparkles, Lightbulb } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
 import { uploadFile } from '@/hooks/useFileUpload';
 import { database } from '@/lib/firebase/clientApp';
@@ -38,6 +38,7 @@ interface AddItineraryItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tripId: string;
+  tripLocation: string;
 }
 
 function AttachmentThumbnail({ type, url }: { type: string; url: string }) {
@@ -78,6 +79,7 @@ export function AddItineraryItemDialog({
   open,
   onOpenChange,
   tripId,
+  tripLocation,
 }: AddItineraryItemDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -470,10 +472,68 @@ export function AddItineraryItemDialog({
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="description" className="text-sm font-medium flex items-center gap-2">
-              Description
-              <span className="text-xs text-muted-foreground">(optional)</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="description" className="text-sm font-medium flex items-center gap-2">
+                Description
+                <span className="text-xs text-muted-foreground">(optional)</span>
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-primary"
+                onClick={async () => {
+                  try {
+                    setIsLoading(true);
+                    const response = await fetch('/api/generate-description', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        title: formData.name,
+                        location: tripLocation,
+                        category: formData.category
+                      }),
+                    });
+
+                    if (!response.ok) throw new Error('Failed to generate ideas');
+                    
+                    const { description } = await response.json();
+                    
+                    // Append the new description to any existing content
+                    setFormData(prev => ({
+                      ...prev,
+                      description: prev.description
+                        ? `${prev.description}\n\n${description}`
+                        : description
+                    }));
+
+                    toast({
+                      title: "Ideas generated",
+                      description: "AI suggestions have been added to the description.",
+                    });
+                  } catch (error) {
+                    console.error('Error generating description:', error);
+                    toast({
+                      title: "Error",
+                      description: "Failed to generate ideas. Please try again.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={isLoading || !formData.name}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Lightbulb className="h-3.5 w-3.5" />
+                )}
+                Ideas
+              </Button>
+            </div>
             <Textarea
               id="description"
               value={formData.description}

@@ -390,6 +390,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
           open={true}
           onOpenChange={(open) => !open && setAddingForHour(null)}
           tripId={trip.shareCode}
+          tripLocation={trip.location}
         />
       )}
 
@@ -402,6 +403,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
           open={true}
           onOpenChange={(open) => !open && setEditingItem(null)}
           tripId={trip.shareCode}
+          tripLocation={trip.location}
         />
       )}
     </div>

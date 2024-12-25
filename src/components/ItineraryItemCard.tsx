@@ -21,33 +21,13 @@ export function ItineraryItemCard({ item, onEdit }: ItineraryItemCardProps) {
 
   return (
     <Card 
-      className="hover:shadow-md transition-shadow cursor-pointer h-full overflow-hidden relative"
+      className="hover:shadow-md transition-shadow cursor-pointer h-full overflow-hidden flex flex-col"
       onClick={() => onEdit(item)}
     >
-      <div className="absolute top-1 right-1 flex items-center gap-1">
-        {attachmentCount > 0 && (
-          <div className="flex items-center gap-1 bg-muted/80 rounded-full px-2 py-0.5 text-xs">
-            <Paperclip className="h-3 w-3" />
-            <span>{attachmentCount}</span>
-          </div>
-        )}
-        {item.createdBy && (
-          <div className="flex items-center gap-1 bg-muted/80 rounded-full px-2 py-0.5 text-xs">
-            {item.createdBy.name || 'Anonymous'}
-          </div>
-        )}
-      </div>
-      <CardContent className="p-3 h-full flex flex-col overflow-hidden">
-        <div className="flex items-center gap-2">
-          <h3 className="font-medium text-sm flex-1">
-            {item.name}
-          </h3>
-          {item.category && (
-            <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
-              {item.category}
-            </span>
-          )}
-        </div>
+      <CardContent className="p-3 flex-1 flex flex-col">
+        <h3 className="font-medium text-sm">
+          {item.name}
+        </h3>
         <p className="text-xs text-muted-foreground mt-1">
           {formatTime(item.startTime)} - {formatTime(item.endTime)}
         </p>
@@ -57,6 +37,26 @@ export function ItineraryItemCard({ item, onEdit }: ItineraryItemCardProps) {
           </p>
         )}
       </CardContent>
+      
+      {/* Bottom bar with pills */}
+      <div className="px-3 py-2 border-t bg-muted/30 flex flex-wrap gap-1.5 items-center">
+        {item.category !== 'None' && (
+          <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+            {item.category}
+          </span>
+        )}
+        {attachmentCount > 0 && (
+          <div className="flex items-center gap-1 bg-muted rounded-full px-2 py-0.5 text-xs">
+            <Paperclip className="h-3 w-3" />
+            <span>{attachmentCount}</span>
+          </div>
+        )}
+        {item.createdBy && (
+          <div className="flex items-center gap-1 bg-muted rounded-full px-2 py-0.5 text-xs">
+            {item.createdBy.name || 'Anonymous'}
+          </div>
+        )}
+      </div>
     </Card>
   );
 } 
