@@ -11,7 +11,7 @@ export interface ItineraryItem {
     type: string;
     size: number;
     path: string;
-  }[];
+  }[] | null;
 }
 
 export interface Trip {

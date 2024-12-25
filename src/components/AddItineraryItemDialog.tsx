@@ -17,6 +17,9 @@ import { uploadAttachment, deleteAttachment, FileUploadResult, getAttachmentDown
 import { Loader2, Trash2, Paperclip, X, FileImage, FileText, FileVideo, Sparkles } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
 import { uploadFile } from '@/hooks/useFileUpload';
+import { database } from '@/lib/firebase/clientApp';
+import { ref, update, get } from 'firebase/database';
+import { useTripUpdate } from '@/contexts/TripUpdateContext';
 
 interface AddItineraryItemDialogProps {
   selectedDate: Date;
@@ -72,6 +75,7 @@ export function AddItineraryItemDialog({
   const [isProcessing, setIsProcessing] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentWithFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { triggerUpdate } = useTripUpdate();
   const [formData, setFormData] = useState({
     quickAdd: '',
     name: '',
@@ -101,34 +105,51 @@ export function AddItineraryItemDialog({
   useEffect(() => {
     if (open) {
       if (editItem) {
-        const startTime = editItem.startTime.split('T')[1].substring(0, 5);
-        const endTime = editItem.endTime.split('T')[1].substring(0, 5);
-        
-        setFormData({
-          quickAdd: '',
-          name: editItem.name,
-          startTime,
-          endTime,
-          description: editItem.description || '',
-        });
+        // Fetch latest item data from database
+        const fetchLatestData = async () => {
+          try {
+            const dateString = format(selectedDate, 'yyyy-MM-dd');
+            const itemRef = ref(database, `trips/${tripId}/itinerary/${dateString}/${editItem.id}`);
+            const snapshot = await get(itemRef);
+            const latestItem = snapshot.val();
+            
+            if (latestItem) {
+              const startTime = latestItem.startTime.split('T')[1].substring(0, 5);
+              const endTime = latestItem.endTime.split('T')[1].substring(0, 5);
+              
+              setFormData({
+                quickAdd: '',
+                name: latestItem.name,
+                startTime,
+                endTime,
+                description: latestItem.description || '',
+              });
 
-        // Validate attachments when loading
-        const validateAttachments = async () => {
-          const validAttachments = [];
-          if (editItem.attachments) {
-            for (const attachment of editItem.attachments) {
-              try {
-                // Try to get the download URL to verify the file exists
-                await getAttachmentDownloadUrl(attachment.path);
-                validAttachments.push(attachment);
-              } catch (error) {
-                console.warn('Attachment not found:', attachment.name);
+              // Validate and set attachments
+              const validAttachments = [];
+              if (latestItem.attachments) {
+                for (const attachment of latestItem.attachments) {
+                  try {
+                    await getAttachmentDownloadUrl(attachment.path);
+                    validAttachments.push(attachment);
+                  } catch (error) {
+                    console.warn('Attachment not found:', attachment.name);
+                  }
+                }
               }
+              setAttachments(validAttachments);
             }
+          } catch (error) {
+            console.error('Error fetching latest item data:', error);
+            toast({
+              title: "Error",
+              description: "Failed to load item data. Please try again.",
+              variant: "destructive",
+            });
           }
-          setAttachments(validAttachments as AttachmentWithFile[]);
         };
-        validateAttachments();
+
+        fetchLatestData();
       } else {
         setFormData({
           quickAdd: '',
@@ -150,7 +171,7 @@ export function AddItineraryItemDialog({
       });
       setAttachments([]);
     }
-  }, [open, editItem]);
+  }, [open, editItem, selectedDate, tripId]);
 
   // Listen for smart upload events
   useEffect(() => {
@@ -308,10 +329,43 @@ export function AddItineraryItemDialog({
 
   const handleRemoveAttachment = async (attachment: FileUploadResult) => {
     try {
-      await deleteAttachment(attachment.url);
-      setAttachments(prev => prev.filter(a => a.url !== attachment.url));
+      // First filter the attachments
+      const remainingAttachments = attachments.filter(a => a.url !== attachment.url);
+      
+      // Update local state
+      setAttachments(remainingAttachments);
+      
+      // Delete from storage
+      await deleteAttachment(attachment.path);
+      
+      // If this is an edit, update the database
+      if (editItem) {
+        const dateString = format(selectedDate, 'yyyy-MM-dd');
+        const itemPath = `trips/${tripId}/itinerary/${dateString}/${editItem.id}`;
+        
+        const updatedItem = {
+          ...editItem,
+          attachments: remainingAttachments.length > 0 ? remainingAttachments : null
+        };
+
+        const updates = {
+          [`${itemPath}/attachments`]: remainingAttachments.length > 0 ? remainingAttachments : null
+        };
+
+        await update(ref(database), updates);
+      }
+
+      toast({
+        title: "Attachment removed",
+        description: "File has been deleted successfully.",
+      });
     } catch (error) {
       console.error('Error removing attachment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete file. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -328,21 +382,24 @@ export function AddItineraryItemDialog({
         endTime: `${dateString}T${formData.endTime || '10:00'}:00.000Z`,
         description: formData.description,
         order: editItem?.order || Date.now(),
-        attachments: attachments.length > 0 ? attachments : undefined,
+        attachments: attachments.length > 0 ? attachments : null
       };
 
-      await onAdd(itemData);
-      onOpenChange(false);
-      setFormData({
-        quickAdd: '',
-        name: '',
-        startTime: '',
-        endTime: '',
-        description: '',
+      // Update the item in the database
+      const itemPath = `trips/${tripId}/itinerary/${dateString}/${itemData.id}`;
+      await update(ref(database), {
+        [itemPath]: itemData
       });
-      setAttachments([]);
+      
+      await triggerUpdate(); // Trigger UI refresh
+      onOpenChange(false);
     } catch (error) {
       console.error('Error saving itinerary item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save item. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -483,13 +540,13 @@ export function AddItineraryItemDialog({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-6 w-6 p-0 text-destructive hover:text-destructive/90"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemoveAttachment(attachment);
                       }}
                     >
-                      <X className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

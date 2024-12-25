@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTripUpdate } from '@/contexts/TripUpdateContext';
 import { uploadFile } from '@/hooks/useFileUpload';
 import { processAttachment } from '@/lib/ai/processAttachment';
+import { deleteAttachment } from '@/lib/firebase/storage';
 
 interface TripItineraryProps {
   trip: Trip;
@@ -152,6 +153,14 @@ export function TripItinerary({ trip }: TripItineraryProps) {
 
   const handleDeleteItem = async (item: ItineraryItem) => {
     try {
+      // First delete any attached files
+      if (item.attachments) {
+        await Promise.all(item.attachments.map(attachment => 
+          deleteAttachment(attachment.path)
+        ));
+      }
+
+      // Then delete the item itself
       const updates: Record<string, any> = {};
       updates[`trips/${trip.shareCode}/itinerary/${dateString}/${item.id}`] = null;
       
