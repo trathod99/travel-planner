@@ -64,6 +64,27 @@ export async function processAttachment(
       const mediaType = getClaudeMediaType(fileType);
       console.log('Using media type:', mediaType);
       
+      const prompt = `Please analyze this image carefully and ALWAYS provide a name, even if you have to make an educated guess. Return your response in this exact JSON format:
+
+{
+  "Name": "REQUIRED - You MUST provide a name, even if uncertain. Examples:
+    - For flights: 'Flight LAX→SFO' or 'Flight to San Francisco'
+    - For hotels: 'Marriott Downtown SF' or 'Hotel in San Francisco'
+    - For activities: 'Museum of Modern Art Tour' or 'Museum Visit'
+    - For restaurants: 'Dinner at Nobu' or 'Restaurant Reservation'
+    If the type is unclear, use a descriptive name based on any visible details.",
+  "Start Time": "time in HH:mm format (24h), or null if unclear",
+  "End Time": "time in HH:mm format (24h), or null if unclear",
+  "Description": "STRING. Do not nest JSON objects. Provide a detailed description including confirmation numbers, locations, contact info, etc. Use bullet points to aid with readability",
+  "Category": "MUST be one of exactly: 'Travel', 'Food', 'Accommodation', or 'Activity'"
+}
+
+IMPORTANT:
+1. The Name field is REQUIRED - you must ALWAYS provide a name
+2. If the exact name is unclear, make your best guess based on the type of item and any visible details
+3. Never return an empty string or null for the Name field
+4. If truly uncertain, use a generic but descriptive name like 'Travel Booking' or 'Event Reservation'`;
+
       const response = await anthropic.messages.create({
         model: 'claude-3-haiku-20240307',
         max_tokens: 1500,
@@ -81,26 +102,7 @@ export async function processAttachment(
             },
             {
               type: 'text',
-              text: `Please analyze this image carefully. Extract ONLY the information you are highly confident about. Return your response in this exact JSON format:
-
-{
-  "Name": "descriptive name - for flights: 'Flight LAX→SFO', for hotels: 'Marriott Downtown SF', for activities: 'Museum of Modern Art Tour'",
-  "Date": "date in YYYY-MM-DD format, or null if unclear. If no year is specified in the image, use the current year. Example: '2024-03-15'",
-  "Start Time": "time in HH:mm format (24h), or null if unclear",
-  "End Time": "time in HH:mm format (24h), or null if unclear",
-  "Description": "STRING. Do not nest JSON objects. Provide a detailed description including confirmation numbers, locations, contact info, etc. Use bullet points to aid with readability",
-  "Category": "MUST be one of exactly: 'Travel', 'Food', 'Accommodation', or 'Activity'. Choose based on these rules:\\n- Travel: For flights, trains, buses, car rentals, or any transportation\\n- Food: For restaurants, cafes, food tours, or any dining experiences\\n- Accommodation: For hotels, resorts, Airbnbs, or any lodging\\n- Activity: For tours, attractions, shows, or any other activities"
-}
-
-Only include fields where you are highly confident about the information. Use null for uncertain fields. For the title, be as specific as possible while keeping it concise. For description, you can include less certain but potentially useful details.
-
-For the Date field:
-1. Extract it from any dates mentioned in the image (e.g., flight date, hotel check-in date, reservation date, etc.)
-2. If multiple dates are found, use the most relevant one for the event
-3. If no year is specified, use the current year (${new Date().getFullYear()})
-4. Always return the date in YYYY-MM-DD format
-
-Based on the content of the image (e.g., if it's a flight confirmation, hotel booking, restaurant reservation, etc.), make sure to set the appropriate Category value.`
+              text: prompt
             }
           ]
         }]
@@ -111,8 +113,25 @@ Based on the content of the image (e.g., if it's a flight confirmation, hotel bo
         throw new Error('Unexpected response format from Claude API');
       }
 
-      console.log('Claude response:', content);
-      return content;
+      // Parse the response and validate the name field
+      const parsedContent = JSON.parse(content);
+      if (!parsedContent.Name || parsedContent.Name.trim() === '') {
+        console.log('AI returned empty name, using fallback');
+        parsedContent.Name = 'Untitled Item';
+        if (parsedContent.Category) {
+          parsedContent.Name = `${parsedContent.Category} Item`;
+        }
+        if (parsedContent.Description) {
+          // Try to extract a name from the first line of the description
+          const firstLine = parsedContent.Description.split('\n')[0].trim();
+          if (firstLine.length > 0) {
+            parsedContent.Name = firstLine.substring(0, 50); // Limit to 50 characters
+          }
+        }
+      }
+
+      console.log('Claude response:', JSON.stringify(parsedContent));
+      return JSON.stringify(parsedContent);
     }
 
     throw new Error('Unsupported file type for AI analysis');

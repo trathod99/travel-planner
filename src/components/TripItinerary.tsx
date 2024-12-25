@@ -223,7 +223,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
       setTimeout(() => {
         const event = new CustomEvent('smart-upload', {
           detail: {
-            name: analysis.Title || '',
+            name: analysis.Name || '',
             startTime: analysis["Start Time"] || '',
             endTime: analysis["End Time"] || '',
             description: analysis.Description || '',
