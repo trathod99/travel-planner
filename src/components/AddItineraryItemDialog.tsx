@@ -20,6 +20,14 @@ import { uploadFile } from '@/hooks/useFileUpload';
 import { database } from '@/lib/firebase/clientApp';
 import { ref, update, get } from 'firebase/database';
 import { useTripUpdate } from '@/contexts/TripUpdateContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useUserManagement } from '@/hooks/useUserManagement';
 
 interface AddItineraryItemDialogProps {
   selectedDate: Date;
@@ -76,12 +84,14 @@ export function AddItineraryItemDialog({
   const [attachments, setAttachments] = useState<AttachmentWithFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { triggerUpdate } = useTripUpdate();
+  const { userData } = useUserManagement();
   const [formData, setFormData] = useState({
     quickAdd: '',
     name: '',
     startTime: '',
     endTime: '',
     description: '',
+    category: editItem?.category || 'Activity' as const
   });
 
   // For debouncing and handling race conditions
@@ -105,58 +115,24 @@ export function AddItineraryItemDialog({
   useEffect(() => {
     if (open) {
       if (editItem) {
-        // Fetch latest item data from database
-        const fetchLatestData = async () => {
-          try {
-            const dateString = format(selectedDate, 'yyyy-MM-dd');
-            const itemRef = ref(database, `trips/${tripId}/itinerary/${dateString}/${editItem.id}`);
-            const snapshot = await get(itemRef);
-            const latestItem = snapshot.val();
-            
-            if (latestItem) {
-              const startTime = latestItem.startTime.split('T')[1].substring(0, 5);
-              const endTime = latestItem.endTime.split('T')[1].substring(0, 5);
-              
-              setFormData({
-                quickAdd: '',
-                name: latestItem.name,
-                startTime,
-                endTime,
-                description: latestItem.description || '',
-              });
-
-              // Validate and set attachments
-              const validAttachments = [];
-              if (latestItem.attachments) {
-                for (const attachment of latestItem.attachments) {
-                  try {
-                    await getAttachmentDownloadUrl(attachment.path);
-                    validAttachments.push(attachment);
-                  } catch (error) {
-                    console.warn('Attachment not found:', attachment.name);
-                  }
-                }
-              }
-              setAttachments(validAttachments);
-            }
-          } catch (error) {
-            console.error('Error fetching latest item data:', error);
-            toast({
-              title: "Error",
-              description: "Failed to load item data. Please try again.",
-              variant: "destructive",
-            });
-          }
-        };
-
-        fetchLatestData();
+        setFormData({
+          quickAdd: '',
+          name: editItem.name,
+          startTime: editItem.startTime.split('T')[1].substring(0, 5),
+          endTime: editItem.endTime.split('T')[1].substring(0, 5),
+          description: editItem.description || '',
+          category: editItem.category
+        });
+        setAttachments(editItem.attachments || []);
       } else {
+        // Reset form when dialog opens for new item
         setFormData({
           quickAdd: '',
           name: '',
-          startTime: '',
-          endTime: '',
+          startTime: defaultHour ? `${defaultHour.toString().padStart(2, '0')}:00` : '',
+          endTime: defaultHour ? `${(defaultHour + 1).toString().padStart(2, '0')}:00` : '',
           description: '',
+          category: 'Activity'
         });
         setAttachments([]);
       }
@@ -168,25 +144,28 @@ export function AddItineraryItemDialog({
         startTime: '',
         endTime: '',
         description: '',
+        category: 'Activity'
       });
       setAttachments([]);
     }
-  }, [open, editItem, selectedDate, tripId]);
+  }, [open, editItem, defaultHour]);
 
   // Listen for smart upload events
   useEffect(() => {
     const handleSmartUpload = (e: CustomEvent) => {
-      const { name, startTime, endTime, description, attachments } = e.detail;
+      const { name, startTime, endTime, description, category, attachments } = e.detail;
       console.log('Smart upload event received:', e.detail); // Debug log
       
       // Directly set form data with the AI analysis results
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         quickAdd: '',
         name: name || '',
         startTime: startTime || '',
         endTime: endTime || '',
         description: description || '',
-      });
+        category: category || prev.category // Use the AI-detected category or keep existing
+      }));
 
       if (attachments) {
         setAttachments(attachments);
@@ -236,6 +215,7 @@ export function AddItineraryItemDialog({
               startTime: processed.startTime,
               endTime: processed.endTime,
               description: processed.description,
+              category: processed.category || prev.category
             }));
           }
         } catch (error: any) {
@@ -303,7 +283,8 @@ export function AddItineraryItemDialog({
         endTime: parsedData["End Time"] || formData.endTime,
         description: formData.description 
           ? `${formData.description}\n\n${parsedData.Description}` 
-          : parsedData.Description
+          : parsedData.Description,
+        category: parsedData.Category || formData.category
       };
       
       console.log('Updating form with:', updatedFormData); // Debug log
@@ -382,7 +363,12 @@ export function AddItineraryItemDialog({
         endTime: `${dateString}T${formData.endTime || '10:00'}:00.000Z`,
         description: formData.description,
         order: editItem?.order || Date.now(),
-        attachments: attachments.length > 0 ? attachments : null
+        attachments: attachments.length > 0 ? attachments : null,
+        category: formData.category,
+        createdBy: editItem?.createdBy || {
+          phoneNumber: userData?.phoneNumber || '',
+          name: userData?.name || null
+        }
       };
 
       // Update the item in the database
@@ -494,6 +480,28 @@ export function AddItineraryItemDialog({
               placeholder="Add a description"
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="category" className="text-sm font-medium">
+              Category
+            </label>
+            <Select
+              value={formData.category}
+              onValueChange={(value: 'Travel' | 'Food' | 'Accommodation' | 'Activity') => 
+                setFormData(prev => ({ ...prev, category: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Travel">Travel</SelectItem>
+                <SelectItem value="Food">Food</SelectItem>
+                <SelectItem value="Accommodation">Accommodation</SelectItem>
+                <SelectItem value="Activity">Activity</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

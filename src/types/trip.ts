@@ -5,6 +5,11 @@ export interface ItineraryItem {
   endTime: string; // ISO string
   description?: string;
   order: number;
+  createdBy: {
+    phoneNumber: string;
+    name: string | null;
+  };
+  category: 'Travel' | 'Food' | 'Accommodation' | 'Activity';
   attachments?: {
     name: string;
     url: string;

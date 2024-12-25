@@ -100,10 +100,13 @@ export async function processAttachment(
   "Title": "descriptive title - for flights: 'Flight LAX→SFO', for hotels: 'Marriott Downtown SF', for activities: 'Museum of Modern Art Tour'",
   "Start Time": "time in HH:mm format (24h), or null if unclear",
   "End Time": "time in HH:mm format (24h), or null if unclear",
-  "Description": "STRING. Do not nest JSON objects. Provide adetailed description including confirmation numbers, locations, contact info, etc. Use bullet points to aid with readability"
+  "Description": "STRING. Do not nest JSON objects. Provide a detailed description including confirmation numbers, locations, contact info, etc. Use bullet points to aid with readability",
+  "Category": "MUST be one of exactly: 'Travel', 'Food', 'Accommodation', or 'Activity'. Choose based on these rules:\\n- Travel: For flights, trains, buses, car rentals, or any transportation\\n- Food: For restaurants, cafes, food tours, or any dining experiences\\n- Accommodation: For hotels, resorts, Airbnbs, or any lodging\\n- Activity: For tours, attractions, shows, or any other activities"
 }
 
-Only include fields where you are highly confident about the information. Use null for uncertain fields. For the title, be as specific as possible while keeping it concise. For description, you can include less certain but potentially useful details.`
+Only include fields where you are highly confident about the information. Use null for uncertain fields. For the title, be as specific as possible while keeping it concise. For description, you can include less certain but potentially useful details.
+
+Based on the content of the image (e.g., if it's a flight confirmation, hotel booking, restaurant reservation, etc.), make sure to set the appropriate Category value.`
             }
           ]
         }]
@@ -123,14 +126,19 @@ Only include fields where you are highly confident about the information. Use nu
         temperature: 0.2,
         messages: [{
           role: 'user',
-          content: `Please analyze this ${file.type} file carefully. Extract ONLY the information you are highly confident about. Format your response EXACTLY like this, with each field on a new line:
+          content: `Please analyze this ${file.type} file carefully. Extract ONLY the information you are highly confident about. Return your response in this exact JSON format:
 
-Title: [descriptive title including key details - for flights: "Flight LAX→SFO", for hotels: "Marriott Downtown SF", for activities: "Museum of Modern Art Tour"]
-Start Time: [time in HH:mm format (24h), or leave blank if unclear]
-End Time: [time in HH:mm format (24h), or leave blank if unclear]
-Description: [detailed description including all relevant details like confirmation numbers, locations, contact info, etc.]
+{
+  "Title": "descriptive title - for flights: 'Flight LAX→SFO', for hotels: 'Marriott Downtown SF', for activities: 'Museum of Modern Art Tour'",
+  "Start Time": "time in HH:mm format (24h), or null if unclear",
+  "End Time": "time in HH:mm format (24h), or null if unclear",
+  "Description": "STRING. Do not nest JSON objects. Provide a detailed description including confirmation numbers, locations, contact info, etc. Use bullet points to aid with readability",
+  "Category": "MUST be one of exactly: 'Travel', 'Food', 'Accommodation', or 'Activity'. Choose based on these rules:\\n- Travel: For flights, trains, buses, car rentals, or any transportation\\n- Food: For restaurants, cafes, food tours, or any dining experiences\\n- Accommodation: For hotels, resorts, Airbnbs, or any lodging\\n- Activity: For tours, attractions, shows, or any other activities"
+}
 
-Only include fields where you are highly confident about the information. Leave fields blank if you're unsure. For the title, be as specific as possible while keeping it concise.
+Only include fields where you are highly confident about the information. Use null for uncertain fields. For the title, be as specific as possible while keeping it concise. For description, you can include less certain but potentially useful details.
+
+Based on the content of the file (e.g., if it's a flight confirmation, hotel booking, restaurant reservation, etc.), make sure to set the appropriate Category value.
 
 Content to analyze:
 ${fileContent}`

@@ -227,6 +227,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
             startTime: analysis["Start Time"] || '',
             endTime: analysis["End Time"] || '',
             description: analysis.Description || '',
+            category: analysis.Category || 'Activity',
             attachments: [attachment]
           }
         });

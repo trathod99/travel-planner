@@ -10,6 +10,7 @@ interface ProcessedItem {
   startTime: string;  // HH:mm format
   endTime: string;   // HH:mm format
   description: string;
+  category: 'Travel' | 'Food' | 'Accommodation' | 'Activity';
 }
 
 export async function processQuickAdd(input: string, fileContent: string): Promise<ProcessedItem> {
@@ -25,6 +26,11 @@ export async function processQuickAdd(input: string, fileContent: string): Promi
     - Hotel/venue names and addresses
     - Booking references
     - Important notes or requirements
+  - category: MUST be one of exactly these values: "Travel", "Food", "Accommodation", or "Activity". Choose based on these rules:
+    - Travel: For flights, trains, buses, car rentals, or any transportation
+    - Food: For restaurants, cafes, food tours, or any dining experiences
+    - Accommodation: For hotels, resorts, Airbnbs, or any lodging
+    - Activity: For tours, attractions, shows, or any other activities
 
   If times aren't specified, make reasonable assumptions. For example:
   - Flights: Use actual flight times from documents
@@ -39,7 +45,8 @@ export async function processQuickAdd(input: string, fileContent: string): Promi
     "title": "✈️ AA123 LAX to JFK",
     "startTime": "15:45",
     "endTime": "23:55",
-    "description": "American Airlines flight AA123\\nConfirmation: ABC123\\nDeparture: LAX Terminal 4\\nArrival: JFK Terminal 8\\nSeat: 12A\\nBaggage: 1 checked bag"
+    "description": "American Airlines flight AA123\\nConfirmation: ABC123\\nDeparture: LAX Terminal 4\\nArrival: JFK Terminal 8\\nSeat: 12A\\nBaggage: 1 checked bag",
+    "category": "Travel"
   }
 
   Return only the JSON object, no other text.`;

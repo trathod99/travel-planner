@@ -24,16 +24,30 @@ export function ItineraryItemCard({ item, onEdit }: ItineraryItemCardProps) {
       className="hover:shadow-md transition-shadow cursor-pointer h-full overflow-hidden relative"
       onClick={() => onEdit(item)}
     >
-      {attachmentCount > 0 && (
-        <div className="absolute top-1 right-1 flex items-center gap-1 bg-muted/80 rounded-full px-2 py-0.5 text-xs">
-          <Paperclip className="h-3 w-3" />
-          <span>{attachmentCount}</span>
-        </div>
-      )}
+      <div className="absolute top-1 right-1 flex items-center gap-1">
+        {attachmentCount > 0 && (
+          <div className="flex items-center gap-1 bg-muted/80 rounded-full px-2 py-0.5 text-xs">
+            <Paperclip className="h-3 w-3" />
+            <span>{attachmentCount}</span>
+          </div>
+        )}
+        {item.createdBy && (
+          <div className="flex items-center gap-1 bg-muted/80 rounded-full px-2 py-0.5 text-xs">
+            {item.createdBy.name || 'Anonymous'}
+          </div>
+        )}
+      </div>
       <CardContent className="p-3 h-full flex flex-col overflow-hidden">
-        <h3 className="font-medium text-sm">
-          {item.name}
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium text-sm flex-1">
+            {item.name}
+          </h3>
+          {item.category && (
+            <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+              {item.category}
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mt-1">
           {formatTime(item.startTime)} - {formatTime(item.endTime)}
         </p>
