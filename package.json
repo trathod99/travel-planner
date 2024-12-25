@@ -22,6 +22,7 @@
     "@radix-ui/react-toast": "^1.2.4",
     "@types/js-cookie": "^3.0.6",
     "@types/pdfjs-dist": "^2.10.377",
+    "@types/twilio": "^3.19.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -35,7 +36,8 @@
     "react-dom": "^19.0.0",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "tesseract.js": "^5.0.0"
+    "tesseract.js": "^5.0.0",
+    "twilio": "^5.4.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -19,7 +19,9 @@ export async function uploadAttachment(
   try {
     const timestamp = Date.now();
     const filename = `${timestamp}-${file.name}`;
-    const path = `trips/${tripId}/attachments/${filename}`;
+    const path = tripId === 'sms-uploads' 
+      ? `sms-uploads/${filename}`
+      : `trips/${tripId}/attachments/${filename}`;
     const storageRef = ref(storage, path);
     
     await uploadBytes(storageRef, file);
