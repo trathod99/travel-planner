@@ -22,7 +22,7 @@ export function TripOverview({ trip, userPhone }: TripOverviewProps) {
     try {
       // For dates, store the date string with a fixed time
       let updatedValue = value;
-      if (field === 'startDate' || field === 'endDate') {
+      if ((field === 'startDate' || field === 'endDate') && value) {
         updatedValue = `${value}T12:00:00.000Z`;
       }
 
@@ -48,6 +48,16 @@ export function TripOverview({ trip, userPhone }: TripOverviewProps) {
     }
   };
 
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '';
+    try {
+      return format(parseISO(dateString), 'yyyy-MM-dd');
+    } catch (error) {
+      console.warn('Invalid date:', dateString);
+      return '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -68,7 +78,8 @@ export function TripOverview({ trip, userPhone }: TripOverviewProps) {
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               <div className="flex-1">
                 <InlineEdit
-                  value={format(parseISO(trip.startDate), 'yyyy-MM-dd')}
+                  value={formatDate(trip.startDate)}
+                  displayValue={formatDate(trip.startDate) || "Click to set start date"}
                   type="date"
                   onSave={(value) => handleSave('startDate', value)}
                 />
@@ -76,7 +87,8 @@ export function TripOverview({ trip, userPhone }: TripOverviewProps) {
               <div className="flex items-center text-gray-400">→</div>
               <div className="flex-1">
                 <InlineEdit
-                  value={format(parseISO(trip.endDate), 'yyyy-MM-dd')}
+                  value={formatDate(trip.endDate)}
+                  displayValue={formatDate(trip.endDate) || "Click to set end date"}
                   type="date"
                   onSave={(value) => handleSave('endDate', value)}
                 />

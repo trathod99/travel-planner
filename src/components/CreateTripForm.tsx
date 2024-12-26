@@ -15,6 +15,7 @@ import { useUserManagement } from '@/hooks/useUserManagement';
 export function CreateTripForm() {
   const router = useRouter();
   const { toast } = useToast();
+  const { userData } = useUserManagement();
   const [isLoading, setIsLoading] = useState(false);
   const [showPhoneAuth, setShowPhoneAuth] = useState(false);
   const [shareCode, setShareCode] = useState<string | null>(null);
@@ -43,8 +44,17 @@ export function CreateTripForm() {
       const tripRef = ref(database, `trips/${newShareCode}`);
       await set(tripRef, tripData);
 
-      // Show phone auth after trip is created
-      setShowPhoneAuth(true);
+      // Only show phone auth if user is not authenticated
+      if (!userData?.phoneNumber) {
+        setShowPhoneAuth(true);
+      } else {
+        // If user is already authenticated, redirect them directly
+        toast({
+          title: "Trip Created!",
+          description: "Your trip has been created successfully.",
+        });
+        router.push(`/trip/${newShareCode}`);
+      }
     } catch (error) {
       console.error('Error preparing trip:', error);
       toast({
