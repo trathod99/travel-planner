@@ -16,6 +16,7 @@ interface TasksProps {
 export function Tasks({ trip }: TasksProps) {
   const { userData } = useUserManagement();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [tripData, setTripData] = useState<TripWithTasks>(trip);
 
   useEffect(() => {
     if (!trip.shareCode) return;
@@ -23,8 +24,9 @@ export function Tasks({ trip }: TasksProps) {
     const tripRef = ref(database, `trips/${trip.shareCode}`);
     const unsubscribe = onValue(tripRef, (snapshot) => {
       if (snapshot.exists()) {
-        const tripData = snapshot.val() as TripWithTasks;
-        setTasks(tripData.tasks ? Object.values(tripData.tasks) : []);
+        const updatedTripData = snapshot.val() as TripWithTasks;
+        setTripData(updatedTripData);
+        setTasks(updatedTripData.tasks ? Object.values(updatedTripData.tasks) : []);
       }
     });
 
@@ -32,7 +34,7 @@ export function Tasks({ trip }: TasksProps) {
   }, [trip.shareCode]);
 
   const handleAddTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'createdBy'>) => {
-    if (!trip || !userData) return;
+    if (!tripData || !userData) return;
 
     const newTask: Task = {
       id: uuidv4(),
@@ -45,18 +47,18 @@ export function Tasks({ trip }: TasksProps) {
     };
 
     const updates: Record<string, any> = {};
-    updates[`trips/${trip.shareCode}/tasks/${newTask.id}`] = newTask;
+    updates[`trips/${tripData.shareCode}/tasks/${newTask.id}`] = newTask;
     await update(ref(database), updates);
   };
 
   const handleToggleComplete = async (taskId: string) => {
-    if (!trip) return;
+    if (!tripData) return;
 
-    const task = trip.tasks?.[taskId];
+    const task = tripData.tasks?.[taskId];
     if (!task) return;
 
     const updates: Record<string, any> = {};
-    updates[`trips/${trip.shareCode}/tasks/${taskId}/completed`] = !task.completed;
+    updates[`trips/${tripData.shareCode}/tasks/${taskId}/completed`] = !task.completed;
     await update(ref(database), updates);
   };
 
@@ -65,7 +67,7 @@ export function Tasks({ trip }: TasksProps) {
   }
 
   // Get list of trip participants from RSVPs
-  const tripParticipants = Object.entries(trip.rsvps || {})
+  const tripParticipants = Object.entries(tripData.rsvps || {})
     .map(([phoneNumber, data]) => ({
       phoneNumber,
       name: data.name || null,

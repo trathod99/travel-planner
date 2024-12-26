@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Task } from '@/types/task';
 
 interface AddTaskProps {
@@ -17,11 +17,6 @@ export default function AddTask({ onAddTask, tripParticipants, currentUser }: Ad
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState<string>('');
   const [dueDate, setDueDate] = useState<string>('');
-
-  // Log participants when they change
-  useEffect(() => {
-    console.log('AddTask received participants:', tripParticipants);
-  }, [tripParticipants]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

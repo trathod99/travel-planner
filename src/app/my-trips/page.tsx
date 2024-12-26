@@ -78,7 +78,6 @@ export default function Page() {
           Object.entries(allTrips).forEach(([tripId, trip]) => {
             const userRSVP = trip.rsvps?.[phoneNumber];
             if (userRSVP) {
-              console.log(`Found RSVP for trip ${tripId}:`, userRSVP);
               const mappedStatus = mapRSVPStatus(userRSVP.status);
               sortedTrips[mappedStatus].push({
                 ...trip,
@@ -93,8 +92,6 @@ export default function Page() {
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             );
           });
-
-          console.log('Sorted trips:', sortedTrips);
         }
 
         setTrips(sortedTrips);
