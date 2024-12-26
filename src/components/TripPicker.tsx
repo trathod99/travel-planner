@@ -17,11 +17,6 @@ interface TripWithRSVP extends Trip {
   rsvpStatus: 'going' | 'maybe' | 'not_going';
 }
 
-interface TripRSVP {
-  phoneNumber: string;
-  status: 'going' | 'maybe' | 'not_going';
-}
-
 export function TripPicker() {
   const router = useRouter();
   const pathname = usePathname();
@@ -31,31 +26,13 @@ export function TripPicker() {
 
   // Fetch user's trips
   useEffect(() => {
-    if (!userData?.phoneNumber) return;
+    if (!userData) return;
     const phoneNumber = userData.phoneNumber;
+    if (!phoneNumber) return;
 
     async function fetchTrips() {
       try {
-        // First, get all RSVPs for the user
-        const userRSVPsRef = ref(database, 'trip-rsvps');
-        const rsvpsSnapshot = await get(userRSVPsRef);
-        const userRSVPs: Record<string, { status: 'going' | 'maybe' | 'not_going' }> = {};
-        
-        if (rsvpsSnapshot.exists()) {
-          // Loop through each trip's RSVPs
-          const rsvpsData = rsvpsSnapshot.val() as Record<string, Record<string, TripRSVP>>;
-          Object.entries(rsvpsData).forEach(([tripId, tripRSVPs]) => {
-            // Find user's RSVP in this trip
-            const userRSVP = Object.values(tripRSVPs).find(
-              (rsvp) => rsvp.phoneNumber === phoneNumber
-            );
-            if (userRSVP) {
-              userRSVPs[tripId] = { status: userRSVP.status };
-            }
-          });
-        }
-
-        // Then, fetch the details of each trip
+        // Fetch all trips
         const tripsRef = ref(database, 'trips');
         const tripsSnapshot = await get(tripsRef);
         
@@ -63,12 +40,14 @@ export function TripPicker() {
 
         if (tripsSnapshot.exists()) {
           const allTrips = tripsSnapshot.val() as Record<string, Trip>;
-          Object.entries(userRSVPs).forEach(([tripId, rsvp]) => {
-            const trip = allTrips[tripId];
-            if (trip) {
+          
+          // Filter trips where user has an RSVP
+          Object.values(allTrips).forEach((trip) => {
+            const userRSVP = trip.rsvps?.[phoneNumber];
+            if (userRSVP) {
               userTrips.push({
                 ...trip,
-                rsvpStatus: rsvp.status,
+                rsvpStatus: userRSVP.status,
               });
             }
           });
@@ -80,59 +59,39 @@ export function TripPicker() {
         }
 
         setTrips(userTrips);
+
+        // Set current trip if we're on a trip page
+        if (pathname.startsWith('/trip/')) {
+          const shareCode = pathname.split('/')[2];
+          const currentTrip = userTrips.find(t => t.shareCode === shareCode);
+          setCurrentTrip(currentTrip || null);
+        }
       } catch (error) {
         console.error('Error fetching trips:', error);
       }
     }
 
     fetchTrips();
-  }, [userData]);
-
-  // Set current trip based on URL
-  useEffect(() => {
-    if (!pathname.startsWith('/trip/')) {
-      setCurrentTrip(null);
-      return;
-    }
-
-    const shareCode = pathname.split('/')[2];
-    const trip = trips.find(t => t.shareCode === shareCode);
-    setCurrentTrip(trip || null);
-  }, [pathname, trips]);
-
-  if (!userData || trips.length === 0) {
-    return (
-      <Link 
-        href="/" 
-        className="text-lg font-semibold hover:text-gray-600 transition-colors"
-      >
-        Home
-      </Link>
-    );
-  }
+  }, [userData, pathname]);
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 text-lg font-semibold hover:text-gray-600">
-        {currentTrip ? currentTrip.name : 'Select Trip'}
-        <ChevronDown className="h-4 w-4" />
+      <DropdownMenuTrigger className="flex items-center gap-2 text-sm">
+        {currentTrip?.name || 'Select Trip'} <ChevronDown className="h-4 w-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuItem asChild>
-          <Link href="/" className="w-full">
-            Create New Trip
-          </Link>
-        </DropdownMenuItem>
+      <DropdownMenuContent align="start">
         {trips.map((trip) => (
-          <DropdownMenuItem
-            key={trip.shareCode}
-            asChild
-          >
-            <Link href={`/trip/${trip.shareCode}`} className="w-full">
+          <DropdownMenuItem key={trip.shareCode} asChild>
+            <Link href={`/trip/${trip.shareCode}`}>
               {trip.name}
             </Link>
           </DropdownMenuItem>
         ))}
+        <DropdownMenuItem asChild>
+          <Link href="/my-trips" className="text-muted-foreground">
+            View All Trips
+          </Link>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -1,70 +1,84 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { use } from 'react';
 import { database } from '@/lib/firebase/clientApp';
 import { ref, get } from 'firebase/database';
 import { notFound } from 'next/navigation';
 import { Trip } from '@/types/trip';
+import { TripWithTasks } from '@/types/task';
 import { PhoneAuth } from '@/components/PhoneAuth';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TripOverview } from '@/components/TripOverview';
 import { TripItinerary } from '@/components/TripItinerary';
+import { Tasks } from '@/components/Tasks';
 import { TripUpdateProvider } from '@/contexts/TripUpdateContext';
 
 interface PageProps {
-  params: Promise<{ shareCode: string }>;
+  params: {
+    shareCode: string;
+  };
 }
 
 export default function TripPage({ params }: PageProps) {
-  const resolvedParams = use(params);
-  const { shareCode } = resolvedParams;
-  
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { userData } = useUserManagement();
+  const [trip, setTrip] = useState<TripWithTasks | null>(null);
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+  const { userData, isLoading } = useUserManagement();
 
-  // Function to fetch latest trip data
   const fetchLatestTrip = async () => {
-    const tripRef = ref(database, `trips/${shareCode}`);
+    const tripRef = ref(database, `trips/${params.shareCode}`);
     const snapshot = await get(tripRef);
     
-    if (snapshot.exists()) {
-      setTrip(snapshot.val());
+    if (!snapshot.exists()) {
+      notFound();
     }
-    setIsLoading(false);
+
+    setTrip(snapshot.val());
   };
 
-  // Initial fetch
   useEffect(() => {
-    fetchLatestTrip();
-  }, [shareCode]);
+    if (isLoading) return;
 
+    if (!userData) {
+      setShowPhoneAuth(true);
+      return;
+    }
+
+    fetchLatestTrip();
+  }, [params.shareCode, userData, isLoading]);
+
+  // Show loading state while checking auth
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-lg">Loading trip details...</p>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-lg text-gray-600">Loading...</p>
       </div>
     );
   }
 
-  if (!trip) {
-    return notFound();
+  // Show phone auth if not authenticated
+  if (showPhoneAuth || !userData) {
+    return (
+      <div className="max-w-md mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold">Verify Your Phone to View Trip</h2>
+          </CardHeader>
+          <CardContent>
+            <PhoneAuth onAuthSuccess={() => setShowPhoneAuth(false)} />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
-  // If user is not authenticated, show phone auth
-  if (!userData) {
+  // Show loading state while fetching trip
+  if (!trip) {
     return (
-      <Card className="max-w-md mx-auto mt-8">
-        <CardHeader>
-          <h1 className="text-2xl font-bold">Sign in to view trip details</h1>
-        </CardHeader>
-        <CardContent>
-          <PhoneAuth redirectPath={`/trip/${shareCode}`} />
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-lg text-gray-600">Loading trip details...</p>
+      </div>
     );
   }
 
@@ -76,6 +90,7 @@ export default function TripPage({ params }: PageProps) {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
+            <TabsTrigger value="tasks">Tasks</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview">
@@ -87,6 +102,10 @@ export default function TripPage({ params }: PageProps) {
           
           <TabsContent value="itinerary">
             <TripItinerary trip={trip} />
+          </TabsContent>
+
+          <TabsContent value="tasks">
+            <Tasks trip={trip} />
           </TabsContent>
         </Tabs>
       </TripUpdateProvider>

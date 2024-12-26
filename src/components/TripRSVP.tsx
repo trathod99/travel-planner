@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { database } from '@/lib/firebase/clientApp';
-import { ref, set, onValue, get } from 'firebase/database';
+import { ref, update, onValue } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -13,52 +13,41 @@ import {
 } from "@/components/ui/select";
 import { useUserManagement } from '@/hooks/useUserManagement';
 
-interface RSVPData {
-  phoneNumber: string;
-  name?: string | null;
-  status: 'going' | 'maybe' | 'not_going';
-  updatedAt: string;
-}
-
 interface TripRSVPProps {
   tripId: string;
   userPhone: string;
-}
-
-interface UserDetails {
-  phoneNumber: string;
-  name: string | null;
 }
 
 export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
   const { toast } = useToast();
   const { userData } = useUserManagement();
   const [rsvpStatus, setRsvpStatus] = useState<string>('');
-  const [allRSVPs, setAllRSVPs] = useState<RSVPData[]>([]);
-  const [userDetails, setUserDetails] = useState<Record<string, UserDetails>>({});
+  const [allRSVPs, setAllRSVPs] = useState<Array<{
+    phoneNumber: string;
+    name: string | null;
+    status: 'going' | 'maybe' | 'not_going';
+  }>>([]);
 
   useEffect(() => {
-    const rsvpsRef = ref(database, `trip-rsvps/${tripId}`);
-    const unsubscribe = onValue(rsvpsRef, async (snapshot) => {
+    if (!tripId) return;
+
+    const tripRef = ref(database, `trips/${tripId}`);
+    const unsubscribe = onValue(tripRef, (snapshot) => {
       if (snapshot.exists()) {
-        const rsvps = Object.values(snapshot.val()) as RSVPData[];
-        setAllRSVPs(rsvps);
+        const tripData = snapshot.val();
+        const rsvps = tripData.rsvps || {};
+
+        // Convert RSVPs to array format
+        const rsvpArray = Object.entries(rsvps).map(([phoneNumber, data]) => ({
+          phoneNumber,
+          name: (data as { name: string | null }).name || null,
+          status: (data as { status: 'going' | 'maybe' | 'not_going' }).status,
+        }));
+
+        setAllRSVPs(rsvpArray);
         
-        // Fetch user details for all RSVPs
-        const userDetailsMap: Record<string, UserDetails> = {};
-        await Promise.all(
-          rsvps.map(async (rsvp) => {
-            const userRef = ref(database, `users/${rsvp.phoneNumber.replace(/[^0-9]/g, '')}`);
-            const userSnapshot = await get(userRef);
-            if (userSnapshot.exists()) {
-              userDetailsMap[rsvp.phoneNumber] = userSnapshot.val();
-            }
-          })
-        );
-        setUserDetails(userDetailsMap);
-        
-        // Find user's RSVP
-        const userRSVP = rsvps.find(rsvp => rsvp.phoneNumber === userPhone);
+        // Set user's RSVP status if found
+        const userRSVP = rsvps[userPhone] as { status: string } | undefined;
         if (userRSVP) {
           setRsvpStatus(userRSVP.status);
         }
@@ -70,14 +59,14 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
 
   const handleRSVPChange = async (newStatus: string) => {
     try {
-      const rsvpData: RSVPData = {
-        phoneNumber: userPhone,
-        name: userData?.name,
-        status: newStatus as RSVPData['status'],
-        updatedAt: new Date().toISOString(),
+      const updates: Record<string, any> = {
+        [`trips/${tripId}/rsvps/${userPhone}`]: {
+          name: userData?.name || null,
+          status: newStatus,
+        },
       };
 
-      await set(ref(database, `trip-rsvps/${tripId}/${userPhone.replace(/[^0-9]/g, '')}`), rsvpData);
+      await update(ref(database), updates);
       setRsvpStatus(newStatus);
       
       toast({
@@ -124,14 +113,16 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
                 <span className="text-sm">
                   {rsvp.phoneNumber === userPhone ? 
                     'You' : 
-                    (userDetails[rsvp.phoneNumber]?.name || 'Guest')}
+                    (rsvp.name || 'Guest')}
                 </span>
                 <span className={`text-sm font-medium ${
                   rsvp.status === 'going' ? 'text-green-600' :
                   rsvp.status === 'maybe' ? 'text-yellow-600' :
                   'text-red-600'
                 }`}>
-                  {rsvp.status.replace('_', ' ')}
+                  {rsvp.status === 'going' ? 'Going' :
+                   rsvp.status === 'maybe' ? 'Maybe' :
+                   'Not Going'}
                 </span>
               </div>
             ))

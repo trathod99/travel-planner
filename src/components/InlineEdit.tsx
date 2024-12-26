@@ -1,7 +1,10 @@
+'use client';
+
 import { useState, useRef, useEffect } from 'react';
 import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { parseISO } from 'date-fns';
 
 interface InlineEditProps {
   value: string;
@@ -45,20 +48,6 @@ export function InlineEdit({ value, displayValue, onSave, type = 'text', classNa
     }
   };
 
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setEditValue(newValue);
-    
-    if (type === 'date') {
-      try {
-        await onSave(newValue);
-        setIsEditing(false);
-      } catch (error) {
-        console.error('Error saving date:', error);
-      }
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSave();
@@ -75,9 +64,9 @@ export function InlineEdit({ value, displayValue, onSave, type = 'text', classNa
           ref={inputRef}
           type={type}
           value={editValue}
-          onChange={handleChange}
+          onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={type === 'date' ? undefined : handleSave}
+          onBlur={handleSave}
           disabled={isLoading}
           className={className}
         />

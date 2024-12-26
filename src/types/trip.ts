@@ -30,4 +30,8 @@ export interface Trip {
   createdAt: string;
   shareCode: string;
   itinerary?: Record<string, Record<string, ItineraryItem>>; // dateString -> Record of items
+  rsvps?: Record<string, {
+    name: string | null;
+    status: 'going' | 'maybe' | 'not_going';
+  }>; // phoneNumber -> RSVP data
 } 

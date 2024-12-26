@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { database } from '@/lib/firebase/clientApp';
-import { ref, get } from 'firebase/database';
+import { ref, get, query, orderByChild, equalTo } from 'firebase/database';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import { Trip } from '@/types/trip';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +12,27 @@ import { useToast } from '@/hooks/use-toast';
 
 interface TripWithRSVP extends Trip {
   rsvpStatus: 'going' | 'maybe' | 'not_going';
+}
+
+// Helper function to map old status values to new ones
+function mapRSVPStatus(status: string): 'going' | 'maybe' | 'not_going' {
+  switch (status) {
+    case 'accepted':
+      return 'going';
+    case 'pending':
+      return 'maybe';
+    case 'declined':
+      return 'not_going';
+    case 'going':
+      return 'going';
+    case 'maybe':
+      return 'maybe';
+    case 'not_going':
+      return 'not_going';
+    default:
+      console.warn(`Unknown RSVP status: ${status}, defaulting to maybe`);
+      return 'maybe';
+  }
 }
 
 export default function Page() {
@@ -30,43 +51,17 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Only redirect if we're sure the user is not authenticated
-    if (!isAuthLoading && !userData) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to view your trips.",
-        variant: "destructive",
-      });
+    if (isAuthLoading) return;
+    if (!userData) {
       router.push('/');
       return;
     }
-
-    // Don't fetch trips if we're still loading auth state or if there's no user
-    if (isAuthLoading || !userData) {
-      return;
-    }
+    const phoneNumber = userData.phoneNumber;
+    if (!phoneNumber) return;
 
     async function fetchTrips() {
       try {
-        // First, get all RSVPs for the user
-        const userRSVPsRef = ref(database, 'trip-rsvps');
-        const rsvpsSnapshot = await get(userRSVPsRef);
-        const userRSVPs: Record<string, { status: 'going' | 'maybe' | 'not_going' }> = {};
-        
-        if (rsvpsSnapshot.exists()) {
-          // Loop through each trip's RSVPs
-          Object.entries(rsvpsSnapshot.val()).forEach(([tripId, tripRSVPs]: [string, any]) => {
-            // Find user's RSVP in this trip
-            const userRSVP = Object.values(tripRSVPs).find(
-              (rsvp: any) => rsvp.phoneNumber === userData.phoneNumber
-            );
-            if (userRSVP) {
-              userRSVPs[tripId] = { status: userRSVP.status };
-            }
-          });
-        }
-
-        // Then, fetch the details of each trip
+        // Fetch all trips
         const tripsRef = ref(database, 'trips');
         const tripsSnapshot = await get(tripsRef);
         
@@ -77,13 +72,17 @@ export default function Page() {
         };
 
         if (tripsSnapshot.exists()) {
-          const allTrips = tripsSnapshot.val();
-          Object.entries(userRSVPs).forEach(([tripId, rsvp]) => {
-            const trip = allTrips[tripId];
-            if (trip) {
-              sortedTrips[rsvp.status].push({
+          const allTrips = tripsSnapshot.val() as Record<string, Trip>;
+          
+          // Filter trips where user has an RSVP
+          Object.entries(allTrips).forEach(([tripId, trip]) => {
+            const userRSVP = trip.rsvps?.[phoneNumber];
+            if (userRSVP) {
+              console.log(`Found RSVP for trip ${tripId}:`, userRSVP);
+              const mappedStatus = mapRSVPStatus(userRSVP.status);
+              sortedTrips[mappedStatus].push({
                 ...trip,
-                rsvpStatus: rsvp.status,
+                rsvpStatus: mappedStatus,
               });
             }
           });
@@ -94,6 +93,8 @@ export default function Page() {
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             );
           });
+
+          console.log('Sorted trips:', sortedTrips);
         }
 
         setTrips(sortedTrips);
@@ -101,7 +102,7 @@ export default function Page() {
         console.error('Error fetching trips:', error);
         toast({
           title: "Error",
-          description: "Failed to load your trips. Please try again.",
+          description: "Failed to load trips. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -110,79 +111,115 @@ export default function Page() {
     }
 
     fetchTrips();
-  }, [userData, router, isAuthLoading, toast]);
-
-  // Show loading state while checking auth
-  if (isAuthLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-lg text-gray-600">Loading...</p>
-      </div>
-    );
-  }
-
-  // Don't show anything while redirecting
-  if (!userData) {
-    return null;
-  }
+  }, [userData, isAuthLoading, router, toast]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-lg text-gray-600">Loading your trips...</p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-muted-foreground">
+          Loading your trips...
+        </div>
       </div>
     );
   }
 
-  const TripCard = ({ trip }: { trip: TripWithRSVP }) => (
-    <Link href={`/trip/${trip.shareCode}`} className="block">
-      <Card className="hover:shadow-md transition-shadow">
-        <CardContent className="pt-6">
-          <h3 className="font-semibold text-lg mb-2">{trip.name}</h3>
-          <p className="text-gray-600 mb-2">{trip.location}</p>
-          {trip.startDate && (
-            <p className="text-sm text-gray-500">
-              {new Date(trip.startDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-              {trip.endDate && ' → '}
-              {trip.endDate && new Date(trip.endDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    </Link>
-  );
-
-  const renderSection = (title: string, trips: TripWithRSVP[]) => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">{title}</h2>
-      {trips.length === 0 ? (
-        <p className="text-gray-500">No trips in this category</p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {trips.map((trip) => (
-            <TripCard key={trip.id} trip={trip} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
   return (
-    <main className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">My Trips</h1>
-      <div className="space-y-8">
-        {renderSection('Going', trips.going)}
-        {renderSection('Maybe', trips.maybe)}
-        {renderSection('Not Going', trips.not_going)}
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold">My Trips</h1>
+        <Link
+          href="/"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md"
+        >
+          Create Trip
+        </Link>
       </div>
-    </main>
+
+      <div className="space-y-8">
+        {/* Going */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Going</h2>
+          {trips.going.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                No trips you're going to yet
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {trips.going.map((trip) => (
+                <Link key={trip.shareCode} href={`/trip/${trip.shareCode}`}>
+                  <Card className="hover:bg-muted/50 transition-colors">
+                    <CardContent className="p-6">
+                      <h3 className="font-medium mb-2">{trip.name}</h3>
+                      <p className="text-sm text-muted-foreground">{trip.location}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Maybe */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Maybe</h2>
+          {trips.maybe.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                No trips you're considering
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {trips.maybe.map((trip) => (
+                <Link key={trip.shareCode} href={`/trip/${trip.shareCode}`}>
+                  <Card className="hover:bg-muted/50 transition-colors">
+                    <CardContent className="p-6">
+                      <h3 className="font-medium mb-2">{trip.name}</h3>
+                      <p className="text-sm text-muted-foreground">{trip.location}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Not Going */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Not Going</h2>
+          {trips.not_going.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                No trips you've declined
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {trips.not_going.map((trip) => (
+                <Link key={trip.shareCode} href={`/trip/${trip.shareCode}`}>
+                  <Card className="hover:bg-muted/50 transition-colors">
+                    <CardContent className="p-6">
+                      <h3 className="font-medium mb-2">{trip.name}</h3>
+                      <p className="text-sm text-muted-foreground">{trip.location}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
   );
 } 
