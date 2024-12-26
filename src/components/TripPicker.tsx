@@ -8,9 +8,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import Link from 'next/link';
 
 interface TripWithRSVP extends Trip {
@@ -65,6 +66,8 @@ export function TripPicker() {
           const shareCode = pathname.split('/')[2];
           const currentTrip = userTrips.find(t => t.shareCode === shareCode);
           setCurrentTrip(currentTrip || null);
+        } else {
+          setCurrentTrip(null);
         }
       } catch (error) {
         console.error('Error fetching trips:', error);
@@ -74,24 +77,55 @@ export function TripPicker() {
     fetchTrips();
   }, [userData, pathname]);
 
+  // Update current trip when pathname changes
+  useEffect(() => {
+    if (pathname.startsWith('/trip/')) {
+      const shareCode = pathname.split('/')[2];
+      const currentTrip = trips.find(t => t.shareCode === shareCode);
+      setCurrentTrip(currentTrip || null);
+    } else {
+      setCurrentTrip(null);
+    }
+  }, [pathname, trips]);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 text-sm">
-        {currentTrip?.name || 'Select Trip'} <ChevronDown className="h-4 w-4" />
+        {currentTrip ? (
+          <span className="max-w-[200px] truncate">{currentTrip.name}</span>
+        ) : (
+          <span>Select Trip</span>
+        )}
+        <ChevronDown className="h-4 w-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {trips.map((trip) => (
-          <DropdownMenuItem key={trip.shareCode} asChild>
-            <Link href={`/trip/${trip.shareCode}`}>
-              {trip.name}
-            </Link>
-          </DropdownMenuItem>
-        ))}
+      <DropdownMenuContent align="start" className="w-[200px]">
         <DropdownMenuItem asChild>
-          <Link href="/my-trips" className="text-muted-foreground">
-            View All Trips
+          <Link href="/" className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create New Trip
           </Link>
         </DropdownMenuItem>
+        
+        {trips.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            {trips.map((trip) => (
+              <DropdownMenuItem key={trip.shareCode} asChild>
+                <Link 
+                  href={`/trip/${trip.shareCode}`}
+                  className="flex items-center justify-between"
+                >
+                  <span className="truncate">{trip.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {trip.rsvpStatus === 'going' ? '(Going)' :
+                     trip.rsvpStatus === 'maybe' ? '(Maybe)' :
+                     '(Not Going)'}
+                  </span>
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

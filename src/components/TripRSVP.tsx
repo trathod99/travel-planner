@@ -21,12 +21,13 @@ interface TripRSVPProps {
 export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
   const { toast } = useToast();
   const { userData } = useUserManagement();
-  const [rsvpStatus, setRsvpStatus] = useState<string>('');
+  const [rsvpStatus, setRsvpStatus] = useState<string | null>(null);
   const [allRSVPs, setAllRSVPs] = useState<Array<{
     phoneNumber: string;
     name: string | null;
     status: 'going' | 'maybe' | 'not_going';
   }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!tripId) return;
@@ -48,10 +49,9 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
         
         // Set user's RSVP status if found
         const userRSVP = rsvps[userPhone] as { status: string } | undefined;
-        if (userRSVP) {
-          setRsvpStatus(userRSVP.status);
-        }
+        setRsvpStatus(userRSVP?.status || null);
       }
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
@@ -87,9 +87,13 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
     <div className="mt-8 space-y-6">
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Your RSVP</h2>
-        <Select value={rsvpStatus} onValueChange={handleRSVPChange}>
+        <Select 
+          value={rsvpStatus || ''} 
+          onValueChange={handleRSVPChange}
+          disabled={isLoading}
+        >
           <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select your status" />
+            <SelectValue placeholder={isLoading ? "Loading..." : "Select your status"} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="going">Going</SelectItem>
@@ -102,7 +106,9 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Who's Going</h2>
         <div className="space-y-2">
-          {allRSVPs.length === 0 ? (
+          {isLoading ? (
+            <p className="text-sm text-gray-500">Loading RSVPs...</p>
+          ) : allRSVPs.length === 0 ? (
             <p className="text-sm text-gray-500">No RSVPs yet</p>
           ) : (
             allRSVPs.map((rsvp) => (
