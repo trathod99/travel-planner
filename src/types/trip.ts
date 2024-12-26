@@ -17,6 +17,7 @@ export interface ItineraryItem {
     size: number;
     path: string;
   }[] | null;
+  votes?: Record<string, boolean>; // phoneNumber -> hasVoted
 }
 
 export interface Trip {

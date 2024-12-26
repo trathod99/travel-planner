@@ -351,6 +351,8 @@ export function TripItinerary({ trip }: TripItineraryProps) {
                 <ItineraryItemCard 
                   item={item}
                   onEdit={setEditingItem}
+                  tripId={trip.shareCode}
+                  dateString={dateString}
                 />
               </div>
             </div>
