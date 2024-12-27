@@ -4,7 +4,6 @@ import { Task } from '@/types/task';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { ClipboardList } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 
 interface MyTasksProps {
   tasks: Task[];
@@ -36,22 +35,18 @@ export function MyTasks({ tasks, currentUser, onToggleComplete }: MyTasksProps) 
 
   if (myTasks.length === 0) {
     return (
-      <Card className="p-6">
-        <div className="flex flex-col items-center justify-center py-4 text-center text-muted-foreground">
-          <ClipboardList className="h-12 w-12 mb-4" />
-          <p>No tasks assigned to you yet</p>
-        </div>
-      </Card>
+      <div className="flex flex-col items-center justify-center py-4 text-center text-muted-foreground">
+        <ClipboardList className="h-12 w-12 mb-4" />
+        <p>No tasks assigned to you yet</p>
+      </div>
     );
   }
 
   return (
-    <Card className="p-6">
-      <div className="space-y-2">
-        {myTasks.map(task => (
-          <TaskItem key={task.id} task={task} />
-        ))}
-      </div>
-    </Card>
+    <div className="space-y-2">
+      {myTasks.map(task => (
+        <TaskItem key={task.id} task={task} />
+      ))}
+    </div>
   );
 } 

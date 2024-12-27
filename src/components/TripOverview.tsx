@@ -139,17 +139,19 @@ export function TripOverview({ trip, userPhone }: TripOverviewProps) {
       </div>
 
       {/* My Tasks Section */}
-      <div className="space-y-2">
-        <h2 className="text-lg font-semibold">My Tasks</h2>
-        <MyTasks
-          tasks={tasks}
-          currentUser={{
-            phoneNumber: userPhone,
-            name: null,
-          }}
-          onToggleComplete={handleToggleComplete}
-        />
-      </div>
+      <Card>
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4">My Tasks</h2>
+          <MyTasks
+            tasks={tasks}
+            currentUser={{
+              phoneNumber: userPhone,
+              name: null,
+            }}
+            onToggleComplete={handleToggleComplete}
+          />
+        </div>
+      </Card>
 
       {/* RSVP Section */}
       <Card>
