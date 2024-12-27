@@ -14,6 +14,7 @@ import { TripOverview } from '@/components/TripOverview';
 import { TripItinerary } from '@/components/TripItinerary';
 import { Tasks } from '@/components/Tasks';
 import { TripUpdateProvider } from '@/contexts/TripUpdateContext';
+import { Home, Calendar, ClipboardList } from 'lucide-react';
 
 interface TripPageClientProps {
   shareCode: string;
@@ -25,6 +26,8 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
   const { userData, isLoading } = useUserManagement();
 
   const fetchLatestTrip = async () => {
+    if (!shareCode) return;
+    
     const tripRef = ref(database, `trips/${shareCode}`);
     const snapshot = await get(tripRef);
     
@@ -82,29 +85,44 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
 
   // Show trip details once authenticated
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="px-0 sm:px-6 max-w-2xl mx-auto">
       <TripUpdateProvider onUpdate={fetchLatestTrip}>
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          </TabsList>
+          <div className="sticky top-0 bg-background border-b">
+            <div className="px-4 sm:px-0">
+              <TabsList className="w-full grid grid-cols-3 h-auto p-2">
+                <TabsTrigger value="overview" className="flex flex-col items-center gap-1 py-2 px-1">
+                  <Home className="h-5 w-5" />
+                  <span className="text-xs font-medium">Overview</span>
+                </TabsTrigger>
+                <TabsTrigger value="itinerary" className="flex flex-col items-center gap-1 py-2 px-1">
+                  <Calendar className="h-5 w-5" />
+                  <span className="text-xs font-medium">Itinerary</span>
+                </TabsTrigger>
+                <TabsTrigger value="tasks" className="flex flex-col items-center gap-1 py-2 px-1">
+                  <ClipboardList className="h-5 w-5" />
+                  <span className="text-xs font-medium">Tasks</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
           
-          <TabsContent value="overview">
-            <TripOverview 
-              trip={trip} 
-              userPhone={userData.phoneNumber} 
-            />
-          </TabsContent>
-          
-          <TabsContent value="itinerary">
-            <TripItinerary trip={trip} />
-          </TabsContent>
+          <div className="px-6">
+            <TabsContent value="overview">
+              <TripOverview 
+                trip={trip} 
+                userPhone={userData.phoneNumber} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="itinerary">
+              <TripItinerary trip={trip} />
+            </TabsContent>
 
-          <TabsContent value="tasks">
-            <Tasks trip={trip} />
-          </TabsContent>
+            <TabsContent value="tasks">
+              <Tasks trip={trip} />
+            </TabsContent>
+          </div>
         </Tabs>
       </TripUpdateProvider>
     </div>

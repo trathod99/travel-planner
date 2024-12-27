@@ -14,6 +14,7 @@ import { TripOverview } from '@/components/TripOverview';
 import { TripItinerary } from '@/components/TripItinerary';
 import { Tasks } from '@/components/Tasks';
 import { TripUpdateProvider } from '@/contexts/TripUpdateContext';
+import { Home, Calendar, ClipboardList } from 'lucide-react';
 
 export default function TripPage() {
   const params = useParams();
@@ -82,15 +83,28 @@ export default function TripPage() {
 
   // Show trip details once authenticated
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <TripUpdateProvider onUpdate={fetchLatestTrip}>
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          </TabsList>
-          
+    <TripUpdateProvider onUpdate={fetchLatestTrip}>
+      <Tabs defaultValue="overview" className="space-y-6">
+        <div className="sticky top-0 w-full bg-background border-b sm:border-b-0 sm:mt-4">
+          <div className="max-w-2xl mx-auto">
+            <TabsList className="w-full grid grid-cols-3 h-auto p-2">
+              <TabsTrigger value="overview" className="flex flex-col items-center gap-1 py-2 px-1">
+                <Home className="h-5 w-5" />
+                <span className="text-xs font-medium">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="itinerary" className="flex flex-col items-center gap-1 py-2 px-1">
+                <Calendar className="h-5 w-5" />
+                <span className="text-xs font-medium">Itinerary</span>
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="flex flex-col items-center gap-1 py-2 px-1">
+                <ClipboardList className="h-5 w-5" />
+                <span className="text-xs font-medium">Tasks</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
+        
+        <div className="max-w-2xl mx-auto px-4 sm:px-6">
           <TabsContent value="overview">
             <TripOverview 
               trip={trip} 
@@ -105,8 +119,8 @@ export default function TripPage() {
           <TabsContent value="tasks">
             <Tasks trip={trip} />
           </TabsContent>
-        </Tabs>
-      </TripUpdateProvider>
-    </div>
+        </div>
+      </Tabs>
+    </TripUpdateProvider>
   );
 } 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { database } from '@/lib/firebase/clientApp';
-import { ref, get } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { Trip } from '@/types/trip';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import {
@@ -25,22 +25,50 @@ export function TripPicker() {
   const [trips, setTrips] = useState<TripWithRSVP[]>([]);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
 
-  // Fetch user's trips
+  // Get current trip's shareCode from pathname
+  const currentShareCode = pathname.startsWith('/trip/') ? pathname.split('/')[2] : null;
+
+  // Listen for changes to the current trip
+  useEffect(() => {
+    if (!currentShareCode) return;
+
+    const tripRef = ref(database, `trips/${currentShareCode}`);
+    const unsubscribe = onValue(tripRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const tripData = snapshot.val() as Trip;
+        setCurrentTrip(tripData);
+        
+        // Also update this trip in the trips list
+        setTrips(prevTrips => {
+          const updatedTrips = [...prevTrips];
+          const index = updatedTrips.findIndex(t => t.shareCode === currentShareCode);
+          if (index !== -1) {
+            updatedTrips[index] = {
+              ...tripData,
+              rsvpStatus: updatedTrips[index].rsvpStatus,
+            };
+          }
+          return updatedTrips;
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentShareCode]);
+
+  // Fetch all user's trips
   useEffect(() => {
     if (!userData) return;
     const phoneNumber = userData.phoneNumber;
     if (!phoneNumber) return;
 
-    async function fetchTrips() {
+    const tripsRef = ref(database, 'trips');
+    const unsubscribe = onValue(tripsRef, (snapshot) => {
       try {
-        // Fetch all trips
-        const tripsRef = ref(database, 'trips');
-        const tripsSnapshot = await get(tripsRef);
-        
         const userTrips: TripWithRSVP[] = [];
 
-        if (tripsSnapshot.exists()) {
-          const allTrips = tripsSnapshot.val() as Record<string, Trip>;
+        if (snapshot.exists()) {
+          const allTrips = snapshot.val() as Record<string, Trip>;
           
           // Filter trips where user has an RSVP
           Object.values(allTrips).forEach((trip) => {
@@ -61,32 +89,18 @@ export function TripPicker() {
 
         setTrips(userTrips);
 
-        // Set current trip if we're on a trip page
-        if (pathname.startsWith('/trip/')) {
-          const shareCode = pathname.split('/')[2];
-          const currentTrip = userTrips.find(t => t.shareCode === shareCode);
+        // Set current trip if we're on a trip page and don't have it yet
+        if (currentShareCode && !currentTrip) {
+          const currentTrip = userTrips.find(t => t.shareCode === currentShareCode);
           setCurrentTrip(currentTrip || null);
-        } else {
-          setCurrentTrip(null);
         }
       } catch (error) {
-        console.error('Error fetching trips:', error);
+        console.error('Error processing trips:', error);
       }
-    }
+    });
 
-    fetchTrips();
-  }, [userData, pathname]);
-
-  // Update current trip when pathname changes
-  useEffect(() => {
-    if (pathname.startsWith('/trip/')) {
-      const shareCode = pathname.split('/')[2];
-      const currentTrip = trips.find(t => t.shareCode === shareCode);
-      setCurrentTrip(currentTrip || null);
-    } else {
-      setCurrentTrip(null);
-    }
-  }, [pathname, trips]);
+    return () => unsubscribe();
+  }, [userData, currentShareCode, currentTrip]);
 
   return (
     <DropdownMenu>
