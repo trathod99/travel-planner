@@ -7,6 +7,7 @@ import { useUserManagement } from '@/hooks/useUserManagement';
 import { useTripUpdate } from '@/contexts/TripUpdateContext';
 import { useToast } from '@/hooks/use-toast';
 import { Trip } from '@/types/trip';
+import { format, parseISO } from 'date-fns';
 
 // Mock Firebase initialization
 jest.mock('firebase/app');
@@ -34,8 +35,9 @@ jest.mock('@/contexts/TripUpdateContext', () => ({
 // Mock date-fns with named exports
 jest.mock('date-fns', () => ({
   format: jest.fn((date, formatStr) => {
-    if (formatStr === 'yyyy-MM-dd') return '2024-01-01';
-    if (formatStr === 'MMM d') return 'Jan 1';
+    const d = new Date(date);
+    if (formatStr === 'yyyy-MM-dd') return d.toISOString().split('T')[0];
+    if (formatStr === 'MMM d') return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`;
     return '10:00 AM';
   }),
   parseISO: jest.fn((date) => new Date(date)),
@@ -67,8 +69,8 @@ jest.mock('@/components/ui/dialog', () => ({
 }));
 
 jest.mock('@/components/ui/button', () => ({
-  Button: ({ children, onClick, className }: { children: React.ReactNode; onClick?: () => void; className?: string }) => (
-    <button onClick={onClick} className={className}>{children}</button>
+  Button: ({ children, onClick, className, disabled, 'data-testid': testId, ...props }: { children: React.ReactNode; onClick?: () => void; className?: string; disabled?: boolean; 'data-testid'?: string }) => (
+    <button onClick={onClick} className={className} disabled={disabled} data-testid={testId} {...props}>{children}</button>
   ),
 }));
 
@@ -175,9 +177,8 @@ describe('TripItinerary', () => {
     customRender(<TripItinerary trip={mockTrip} />);
     
     // Check if the date selector is rendered - find the selected date button
-    const dateButtons = screen.getAllByRole('button', { name: 'Jan 1' });
-    const selectedDateButton = dateButtons.find(button => button.className.includes('bg-primary'));
-    expect(selectedDateButton).toBeInTheDocument();
+    const selectedButton = screen.getByRole('button', { name: 'Dec 31' });
+    expect(selectedButton.className).toContain('bg-primary text-primary-foreground');
     
     // Check if the itinerary item is rendered
     expect(screen.getByText('Test Activity')).toBeInTheDocument();
@@ -273,6 +274,69 @@ describe('TripItinerary', () => {
     expect(mockToast).toHaveBeenCalledWith({
       title: 'Item updated',
       description: expect.any(String),
+    });
+  });
+
+  describe('Day Picker', () => {
+    it('displays all dates between trip start and end dates', () => {
+      customRender(<TripItinerary trip={mockTrip} />);
+      
+      // Check for dates from Dec 31 to Jan 7
+      const expectedDates = [
+        'Dec 31', 'Jan 1', 'Jan 2', 'Jan 3', 'Jan 4', 'Jan 5', 'Jan 6'
+      ];
+      
+      expectedDates.forEach(date => {
+        const dateButton = screen.getByRole('button', { name: date });
+        expect(dateButton).toBeInTheDocument();
+      });
+    });
+
+    it('highlights the selected date', () => {
+      customRender(<TripItinerary trip={mockTrip} />);
+      
+      // Initially Dec 31 should be selected
+      const selectedButton = screen.getByRole('button', { name: 'Dec 31' });
+      expect(selectedButton.className).toContain('bg-primary text-primary-foreground');
+    });
+
+    it('allows navigation between dates using arrow buttons', async () => {
+      const user = userEvent.setup();
+      customRender(<TripItinerary trip={mockTrip} />);
+      
+      // Find navigation buttons by their icons
+      const nextButton = screen.getByTestId('next-date-button');
+      const prevButton = screen.getByTestId('prev-date-button');
+      
+      expect(nextButton).toBeInTheDocument();
+      expect(prevButton).toBeInTheDocument();
+      
+      // Initially prev button should be disabled
+      expect(prevButton).toBeDisabled();
+      expect(nextButton).not.toBeDisabled();
+      
+      // Click next button
+      await user.click(nextButton);
+      
+      // Now Jan 1 should be selected
+      const selectedButton = screen.getByRole('button', { name: 'Jan 1' });
+      expect(selectedButton.className).toContain('bg-primary text-primary-foreground');
+    });
+
+    it('shows itinerary items for the selected date', async () => {
+      const user = userEvent.setup();
+      customRender(<TripItinerary trip={mockTrip} />);
+      
+      // Initially we should see the test activity
+      expect(screen.getByText('Test Activity')).toBeInTheDocument();
+      
+      // Move to Jan 2 using the next button
+      const nextButton = screen.getByTestId('next-date-button');
+      await user.click(nextButton);
+      await user.click(nextButton);
+      
+      // Should not see the test activity anymore
+      expect(screen.queryByText('Test Activity')).not.toBeInTheDocument();
     });
   });
 }); 

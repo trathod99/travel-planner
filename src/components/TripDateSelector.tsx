@@ -43,6 +43,8 @@ export function TripDateSelector({ startDate, endDate, selectedDate, onDateSelec
           size="icon"
           onClick={handlePrevious}
           disabled={isSameDay(selectedDate, startDate)}
+          aria-label="Previous date"
+          data-testid="prev-date-button"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -80,6 +82,8 @@ export function TripDateSelector({ startDate, endDate, selectedDate, onDateSelec
           size="icon"
           onClick={handleNext}
           disabled={isSameDay(selectedDate, endDate)}
+          aria-label="Next date"
+          data-testid="next-date-button"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
