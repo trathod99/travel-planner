@@ -123,6 +123,7 @@ export function CreateTripForm() {
                 date={startDate}
                 setDate={setStartDate}
                 placeholder="Start date"
+                data-testid="start-date"
               />
             </div>
             <div className="space-y-2">
@@ -131,6 +132,7 @@ export function CreateTripForm() {
                 date={endDate}
                 setDate={setEndDate}
                 placeholder="End date"
+                data-testid="end-date"
               />
             </div>
           </div>

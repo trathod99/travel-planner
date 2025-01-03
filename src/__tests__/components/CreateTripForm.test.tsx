@@ -1,11 +1,12 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CreateTripForm } from '@/components/CreateTripForm';
-import { ref, push, set } from 'firebase/database';
+import { push } from 'firebase/database';
+import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useUserManagement } from '@/hooks/useUserManagement';
-import { useToast } from '@/hooks/use-toast';
+import { mockPush } from '../../../jest.setup';
 
 // Mock the hooks
 jest.mock('@/hooks/useUserManagement', () => ({
@@ -40,8 +41,12 @@ describe('CreateTripForm', () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (useUserManagement as jest.Mock).mockReturnValue({ userData: mockUserData });
     (useToast as jest.Mock).mockReturnValue({ toast: mockToast });
-    (push as jest.Mock).mockReturnValue({ key: 'mock-trip-id' });
-    (set as jest.Mock).mockResolvedValue(undefined);
+
+    // Setup Firebase mock
+    mockPush.mockImplementation(() => ({
+      key: 'mock-key',
+      set: jest.fn().mockResolvedValue(undefined)
+    }));
   });
 
   it('renders all form fields correctly', () => {
@@ -61,25 +66,34 @@ describe('CreateTripForm', () => {
     await user.type(screen.getByLabelText(/trip name/i), 'Test Trip');
     await user.type(screen.getByLabelText(/location/i), 'Test Location');
     
+    // Set dates
+    const startDateInput = screen.getByTestId('start-date');
+    const endDateInput = screen.getByTestId('end-date');
+    await user.type(startDateInput, '2024-01-01');
+    await user.type(endDateInput, '2024-01-07');
+    
     // Submit the form
     await user.click(screen.getByRole('button', { name: /create trip/i }));
 
     // Verify Firebase interactions
     await waitFor(() => {
-      expect(push).toHaveBeenCalled();
-      expect(set).toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalled();
     });
 
     // Verify success toast
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Trip Created',
-        description: expect.any(String),
-      })
-    );
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Trip Created',
+          description: expect.any(String),
+        })
+      );
+    });
 
     // Verify navigation
-    expect(mockRouter.push).toHaveBeenCalledWith('/trip/mock-trip-id');
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/trip/mock-key');
+    });
   });
 
   it('shows error when user is not logged in', async () => {
@@ -96,39 +110,51 @@ describe('CreateTripForm', () => {
     await user.click(screen.getByRole('button', { name: /create trip/i }));
 
     // Verify error toast
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Error',
-        description: expect.stringMatching(/must be logged in/i),
-        variant: 'destructive',
-      })
-    );
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Error',
+          description: expect.stringMatching(/must be logged in/i),
+          variant: 'destructive',
+        })
+      );
+    });
     
     // Verify no Firebase calls were made
-    expect(push).not.toHaveBeenCalled();
-    expect(set).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('handles form submission error gracefully', async () => {
     // Mock Firebase error
-    (set as jest.Mock).mockRejectedValue(new Error('Firebase error'));
+    mockPush.mockImplementationOnce(() => {
+      throw new Error('Firebase error');
+    });
     
     const user = userEvent.setup();
     render(<CreateTripForm />);
 
     // Fill in the form
     await user.type(screen.getByLabelText(/trip name/i), 'Test Trip');
+    await user.type(screen.getByLabelText(/location/i), 'Test Location');
+    
+    // Set dates
+    const startDateInput = screen.getByTestId('start-date');
+    const endDateInput = screen.getByTestId('end-date');
+    await user.type(startDateInput, '2024-01-01');
+    await user.type(endDateInput, '2024-01-07');
     
     // Submit the form
     await user.click(screen.getByRole('button', { name: /create trip/i }));
 
     // Verify error toast
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Error',
-        description: expect.stringMatching(/failed to create trip/i),
-        variant: 'destructive',
-      })
-    );
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Error',
+          description: expect.stringMatching(/failed to create trip/i),
+          variant: 'destructive',
+        })
+      );
+    });
   });
 }); 

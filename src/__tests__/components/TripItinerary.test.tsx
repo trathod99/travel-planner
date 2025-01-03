@@ -3,34 +3,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TripItinerary } from '@/components/TripItinerary';
 import { ref, update, onValue, getDatabase } from 'firebase/database';
-import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
-import { initializeApp, getApps, getApp } from 'firebase/app';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import { useTripUpdate } from '@/contexts/TripUpdateContext';
 import { useToast } from '@/hooks/use-toast';
 import { Trip } from '@/types/trip';
 
 // Mock Firebase initialization
-jest.mock('firebase/app', () => ({
-  initializeApp: jest.fn(),
-  getApps: jest.fn(() => []),
-  getApp: jest.fn(),
-}));
+jest.mock('firebase/app');
 
 jest.mock('firebase/database', () => ({
   ref: jest.fn(),
   update: jest.fn().mockResolvedValue(undefined),
   onValue: jest.fn(),
   getDatabase: jest.fn(() => ({})),
-}));
-
-jest.mock('firebase/storage', () => ({
-  getStorage: jest.fn(() => ({})),
-}));
-
-jest.mock('firebase/auth', () => ({
-  getAuth: jest.fn(() => ({})),
 }));
 
 // Mock the hooks and contexts
