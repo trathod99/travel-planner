@@ -10,7 +10,7 @@ import { format, parseISO } from 'date-fns';
 import { Loader2, Calendar, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DatePicker } from '@/components/ui/date-picker';
+import { SimpleDatePicker } from '@/components/ui/simple-date-picker';
 import { TripRSVP } from './TripRSVP';
 import TaskList from './tasks/TaskList';
 import {
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Task } from '@/types/task';
 import { CopyLink } from '@/components/CopyLink';
+import { Label } from '@/components/ui/label';
 
 interface TripOverviewProps {
   trip: {
@@ -208,98 +209,98 @@ export function TripOverview({ trip }: TripOverviewProps) {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        {isEditing ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <Input
-                value={editedLocation}
-                onChange={(e) => setEditedLocation(e.target.value)}
-                placeholder="Add location..."
-                className="max-w-[300px]"
+    <div className="space-y-6">
+      {isEditing ? (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="location" className="text-sm font-medium">
+              Location
+            </label>
+            <Input
+              id="location"
+              value={editedLocation}
+              onChange={(e) => setEditedLocation(e.target.value)}
+              placeholder="Enter location"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Start Date</Label>
+              <SimpleDatePicker
+                date={editedStartDate}
+                setDate={setEditedStartDate}
+                placeholder="Start date"
               />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <DatePicker
-                  date={editedStartDate}
-                  setDate={setEditedStartDate}
-                  placeholder="Start date"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <DatePicker
-                  date={editedEndDate}
-                  setDate={setEditedEndDate}
-                  placeholder="End date"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>End Date</Label>
+              <SimpleDatePicker
+                date={editedEndDate}
+                setDate={setEditedEndDate}
+                placeholder="End date"
+              />
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button onClick={handleSaveChanges} disabled={isUpdating}>
+              Save Changes
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditedLocation(trip.location || '');
+                setEditedStartDate(trip.startDate ? new Date(trip.startDate) : undefined);
+                setEditedEndDate(trip.endDate ? new Date(trip.endDate) : undefined);
+                setIsEditing(false);
+              }}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {(trip.location || isAdmin) && (
             <div className="flex items-center gap-2">
-              {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Button onClick={handleSaveChanges} disabled={isUpdating}>
-                Save Changes
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setEditedLocation(trip.location || '');
-                  setEditedStartDate(trip.startDate ? parseISO(trip.startDate) : undefined);
-                  setEditedEndDate(trip.endDate ? parseISO(trip.endDate) : undefined);
-                  setIsEditing(false);
-                }}
-                disabled={isUpdating}
-              >
-                Cancel
-              </Button>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">
+                {trip.location || 'No location set'}
+              </span>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {(trip.location || isAdmin) && (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {trip.location || 'No location set'}
-                </span>
-              </div>
-            )}
-            {(trip.startDate || trip.endDate || isAdmin) && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {formatDate(trip.startDate) || 'Start date'} 
-                  {trip.endDate && ' - '} 
-                  {formatDate(trip.endDate)}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-2 mt-4">
-              <CopyLink shareCode={trip.id} />
-              {isAdmin && (
-                <>
-                  <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
-                    Edit Details
-                  </Button>
-                  <Button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    variant="destructive"
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete Trip
-                  </Button>
-                </>
-              )}
+          )}
+          {(trip.startDate || trip.endDate || isAdmin) && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">
+                {formatDate(trip.startDate) || 'Start date'} 
+                {trip.endDate && ' - '} 
+                {formatDate(trip.endDate)}
+              </span>
             </div>
+          )}
+          <div className="flex items-center gap-2 mt-4">
+            <CopyLink shareCode={trip.id} />
+            {isAdmin && (
+              <>
+                <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
+                  Edit Details
+                </Button>
+                <Button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Trip
+                </Button>
+              </>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {userData?.phoneNumber && (
         <TripRSVP tripId={trip.id} userPhone={userData.phoneNumber} />

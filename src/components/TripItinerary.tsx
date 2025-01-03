@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Plus, Sparkles, Upload } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { TripDateSelector } from './TripDateSelector';
 import { AddItineraryItemDialog } from './AddItineraryItemDialog';
 import { ItineraryItemCard } from './ItineraryItemCard';
@@ -306,7 +306,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
       <div className="relative">
         <div className="absolute top-0 left-0 w-16 bg-background">
           {hours.map((hour) => (
-            <div key={hour} className="h-24 border-b flex items-start justify-end pr-4 pt-2">
+            <div key={`hour-label-${hour}`} className="h-24 border-b flex items-start justify-end pr-4 pt-2">
               <span className="text-sm text-muted-foreground">
                 {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
               </span>
@@ -317,7 +317,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
         <div className="ml-16 relative">
           {/* Hour blocks */}
           {hours.map((hour) => (
-            <div key={hour} className="h-24 border-b relative group">
+            <div key={`hour-block-${hour}`} className="h-24 border-b relative group">
               <Button
                 variant="ghost"
                 size="sm"
@@ -333,7 +333,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
           {/* Positioned items */}
           {positionedItems.map(item => (
             <div
-              key={item.id}
+              key={`item-${item.id}-${dateString}`}
               className="absolute left-0 right-0"
               style={{
                 top: `${item.top}px`,
@@ -349,6 +349,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
                 }}
               >
                 <ItineraryItemCard 
+                  key={`card-${item.id}-${dateString}`}
                   item={item}
                   onEdit={setEditingItem}
                   tripId={trip.shareCode}

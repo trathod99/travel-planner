@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, addDays, isSameDay } from "date-fns";
-import { useRef, useEffect } from "react";
+import { useRef } from "react";
 
 interface TripDateSelectorProps {
   startDate: Date;

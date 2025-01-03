@@ -121,7 +121,7 @@ export function TripPicker() {
         </DropdownMenuItem>
         
         {trips.length > 0 && (
-          <>
+          <div key="trips-section">
             <DropdownMenuSeparator />
             {trips.map((trip) => (
               <DropdownMenuItem key={trip.shareCode} asChild>
@@ -138,7 +138,7 @@ export function TripPicker() {
                 </Link>
               </DropdownMenuItem>
             ))}
-          </>
+          </div>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
