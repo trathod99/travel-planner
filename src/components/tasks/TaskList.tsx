@@ -3,15 +3,32 @@
 import { Task } from '@/types/task';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, MoreVertical, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from '@/components/ui/button';
 
 interface TaskListProps {
   tasks: Task[];
   currentUser: { phoneNumber: string; name: string | null };
   onToggleComplete: (taskId: string) => void;
+  onDeleteTask: (taskId: string) => void;
+  isAdmin?: boolean;
+  showOnlyUserTasks?: boolean;
 }
 
-export default function TaskList({ tasks, currentUser, onToggleComplete }: TaskListProps) {
+export default function TaskList({ 
+  tasks, 
+  currentUser, 
+  onToggleComplete, 
+  onDeleteTask,
+  isAdmin = false,
+  showOnlyUserTasks = false,
+}: TaskListProps) {
   const myTasks = tasks.filter(task => 
     !task.completed && task.assignee?.phoneNumber === currentUser.phoneNumber
   );
@@ -19,76 +36,102 @@ export default function TaskList({ tasks, currentUser, onToggleComplete }: TaskL
   const allTasks = tasks.filter(task => !task.completed);
   const completedTasks = tasks.filter(task => task.completed);
 
-  const EmptyState = ({ message }: { message: string }) => (
-    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-      <ClipboardList className="h-12 w-12 mb-4" />
-      <p>{message}</p>
-    </div>
-  );
+  const displayTasks = showOnlyUserTasks ? myTasks : allTasks;
 
-  const TaskItem = ({ task }: { task: Task }) => (
-    <div className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm">
-      <Checkbox
-        checked={task.completed}
-        onCheckedChange={() => onToggleComplete(task.id)}
-      />
-      <div className="flex-1 min-w-0">
-        <h3 className="font-medium truncate">{task.title}</h3>
-        <div className="flex gap-2 text-sm text-muted-foreground">
-          {task.dueDate && (
-            <span>Due: {format(new Date(task.dueDate), 'MMM d')}</span>
-          )}
-          {task.assignee && (
-            <>
-              <span>•</span>
-              <span>Assigned to: {task.assignee.name || task.assignee.phoneNumber}</span>
-            </>
-          )}
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+        <ClipboardList className="h-12 w-12 mb-4" />
+        <p>No tasks yet</p>
+      </div>
+    );
+  }
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM d, yyyy');
+    } catch {
+      return null;
+    }
+  };
+
+  const renderTask = (task: Task) => (
+    <div key={task.id} className="flex items-center justify-between py-3">
+      <div className="flex items-start gap-3 flex-1">
+        <Checkbox
+          checked={task.completed}
+          onCheckedChange={() => onToggleComplete(task.id)}
+          disabled={!isAdmin && task.assignee?.phoneNumber !== currentUser.phoneNumber}
+        />
+        <div className="space-y-1">
+          <p className={`text-sm font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
+            {task.title}
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            {task.assignee && (
+              <span>
+                Assigned to: {task.assignee.phoneNumber === currentUser.phoneNumber ? 'You' : (task.assignee.name || 'Guest')}
+              </span>
+            )}
+            {task.dueDate && (
+              <>
+                <span>•</span>
+                <span>Due: {formatDate(task.dueDate)}</span>
+              </>
+            )}
+            {task.createdBy && (
+              <>
+                <span>•</span>
+                <span>
+                  Added by: {task.createdBy.phoneNumber === currentUser.phoneNumber ? 'You' : (task.createdBy.name || 'Guest')}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
+      {isAdmin && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => onDeleteTask(task.id)}
+              className="text-destructive gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Task
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 
   return (
-    <div className="space-y-8">
-      <section>
-        <h2 className="text-lg font-semibold mb-4">My Tasks</h2>
-        {myTasks.length > 0 ? (
-          <div className="space-y-2">
-            {myTasks.map(task => (
-              <TaskItem key={task.id} task={task} />
-            ))}
+    <div className="space-y-6">
+      {displayTasks.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            {showOnlyUserTasks ? 'Your Tasks' : 'Active Tasks'}
+          </h3>
+          <div className="space-y-1">
+            {displayTasks.map(renderTask)}
           </div>
-        ) : (
-          <EmptyState message="No tasks assigned to you yet" />
-        )}
-      </section>
+        </div>
+      )}
 
-      <section>
-        <h2 className="text-lg font-semibold mb-4">All Tasks</h2>
-        {allTasks.length > 0 ? (
-          <div className="space-y-2">
-            {allTasks.map(task => (
-              <TaskItem key={task.id} task={task} />
-            ))}
+      {!showOnlyUserTasks && completedTasks.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">Completed</h3>
+          <div className="space-y-1">
+            {completedTasks.map(renderTask)}
           </div>
-        ) : (
-          <EmptyState message="No active tasks for this trip" />
-        )}
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Completed Tasks</h2>
-        {completedTasks.length > 0 ? (
-          <div className="space-y-2">
-            {completedTasks.map(task => (
-              <TaskItem key={task.id} task={task} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState message="No completed tasks yet" />
-        )}
-      </section>
+        </div>
+      )}
     </div>
   );
 } 

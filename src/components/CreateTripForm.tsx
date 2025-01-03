@@ -2,64 +2,89 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { database } from '@/lib/firebase/clientApp';
+import { ref, push, set } from 'firebase/database';
+import { useToast } from '@/hooks/use-toast';
+import { useUserManagement } from '@/hooks/useUserManagement';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
-import { database } from '@/lib/firebase/clientApp';
-import { ref, set } from 'firebase/database';
-import { generateShareCode } from '@/utils/generateShareCode';
-import { PhoneAuth } from './PhoneAuth';
-import { useUserManagement } from '@/hooks/useUserManagement';
+import { Label } from '@/components/ui/label';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export function CreateTripForm() {
   const router = useRouter();
   const { toast } = useToast();
   const { userData } = useUserManagement();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
-  const [shareCode, setShareCode] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    location: '',
-    startDate: '',
-    endDate: '',
-    description: '',
-  });
+  const [tripName, setTripName] = useState('');
+  const [location, setLocation] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    try {
-      // Generate share code and store trip data first
-      const newShareCode = await generateShareCode(formData.name);
-      setShareCode(newShareCode);
-      
-      const tripData = {
-        ...formData,
-        id: newShareCode,
-        shareCode: newShareCode,
-        createdAt: new Date().toISOString(),
-      };
-
-      const tripRef = ref(database, `trips/${newShareCode}`);
-      await set(tripRef, tripData);
-
-      // Only show phone auth if user is not authenticated
-      if (!userData?.phoneNumber) {
-        setShowPhoneAuth(true);
-      } else {
-        // If user is already authenticated, redirect them directly
-        toast({
-          title: "Trip Created!",
-          description: "Your trip has been created successfully.",
-        });
-        router.push(`/trip/${newShareCode}`);
-      }
-    } catch (error) {
-      console.error('Error preparing trip:', error);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userData?.phoneNumber) {
       toast({
         title: "Error",
-        description: "Failed to prepare trip. Please try again.",
+        description: "You must be logged in to create a trip.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const tripsRef = ref(database, 'trips');
+      const newTripRef = push(tripsRef);
+      const tripId = newTripRef.key;
+
+      if (!tripId) {
+        throw new Error('Failed to generate trip ID');
+      }
+
+      const creatorData = {
+        phoneNumber: userData.phoneNumber,
+        name: userData.name || null,
+      };
+
+      const tripData = {
+        id: tripId,
+        shareCode: tripId,
+        name: tripName,
+        location: location || null,
+        startDate: startDate?.toISOString() || null,
+        endDate: endDate?.toISOString() || null,
+        createdAt: new Date().toISOString(),
+        createdBy: creatorData,
+        rsvps: {
+          [userData.phoneNumber]: {
+            name: userData.name || null,
+            status: 'going',
+          },
+        },
+        admins: {
+          [userData.phoneNumber]: {
+            name: userData.name || null,
+            addedAt: new Date().toISOString(),
+            addedBy: creatorData,
+          },
+        },
+      };
+
+      await set(newTripRef, tripData);
+
+      toast({
+        title: "Trip Created",
+        description: "Your trip has been created successfully.",
+      });
+
+      router.push(`/trip/${tripId}`);
+    } catch (error) {
+      console.error('Error creating trip:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create trip. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -67,92 +92,51 @@ export function CreateTripForm() {
     }
   };
 
-  const handleAuthSuccess = () => {
-    if (!shareCode) return;
-    
-    toast({
-      title: "Trip Created!",
-      description: "Your trip has been created successfully.",
-    });
-    
-    router.push(`/trip/${shareCode}`);
-  };
-
-  if (showPhoneAuth) {
-    return (
-      <div className="w-full space-y-4">
-        <h2 className="text-lg font-semibold mb-4">Verify Your Phone to View Trip</h2>
-        <PhoneAuth onAuthSuccess={handleAuthSuccess} />
-      </div>
-    );
-  }
-
   return (
-    <form onSubmit={(e) => e.preventDefault()} className="w-full space-y-6">
-      <div className="space-y-4">
-        <Input
-          required
-          type="text"
-          placeholder="Trip Name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-        />
-        
-        <Input
-          required
-          type="text"
-          placeholder="Location"
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-        />
-        
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 space-y-2">
-            <label htmlFor="startDate" className="text-sm text-gray-600">
-              Start Date (optional)
-            </label>
+    <Card>
+      <CardHeader>
+        <CardTitle>Create a New Trip</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="tripName">Trip Name</Label>
             <Input
-              id="startDate"
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              id="tripName"
+              value={tripName}
+              onChange={(e) => setTripName(e.target.value)}
+              required
             />
           </div>
-          
-          <div className="flex-1 space-y-2">
-            <label htmlFor="endDate" className="text-sm text-gray-600">
-              End Date (optional)
-            </label>
+          <div className="space-y-2">
+            <Label htmlFor="location">Location</Label>
             <Input
-              id="endDate"
-              type="date"
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+              id="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
             />
           </div>
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="description" className="text-sm text-gray-600">
-            Description (optional)
-          </label>
-          <Textarea
-            id="description"
-            placeholder="Add any additional details about the trip..."
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="min-h-[100px]"
-          />
-        </div>
-      </div>
-      
-      <Button 
-        onClick={handleSubmit} 
-        disabled={isLoading || !formData.name || !formData.location}
-        className="w-full py-6"
-      >
-        {isLoading ? "Creating..." : "Create Trip"}
-      </Button>
-    </form>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Start Date</Label>
+              <DatePicker
+                date={startDate}
+                setDate={setStartDate}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>End Date</Label>
+              <DatePicker
+                date={endDate}
+                setDate={setEndDate}
+              />
+            </div>
+          </div>
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Creating...' : 'Create Trip'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 } 

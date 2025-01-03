@@ -94,6 +94,7 @@ export function useUserManagement() {
       setUserData(null);
       setIsNewUser(false);
       Cookies.remove('userData');
+      window.location.href = '/';
       return true;
     } catch (error) {
       console.error('Logout error:', error);

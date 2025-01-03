@@ -29,6 +29,18 @@ export interface Trip {
   description?: string;
   createdAt: string;
   shareCode: string;
+  createdBy: {
+    phoneNumber: string;
+    name: string | null;
+  };
+  admins: Record<string, {
+    name: string | null;
+    addedAt: string;
+    addedBy: {
+      phoneNumber: string;
+      name: string | null;
+    };
+  }>; // phoneNumber -> admin data
   itinerary?: Record<string, Record<string, ItineraryItem>>; // dateString -> Record of items
   rsvps?: Record<string, {
     name: string | null;

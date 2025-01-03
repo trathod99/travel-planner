@@ -1,130 +1,109 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { database } from '@/lib/firebase/clientApp';
-import { ref, get } from 'firebase/database';
-import { notFound } from 'next/navigation';
-import { Trip } from '@/types/trip';
-import { TripWithTasks } from '@/types/task';
-import { PhoneAuth } from '@/components/PhoneAuth';
+import { ref, onValue } from 'firebase/database';
+import { useToast } from '@/hooks/use-toast';
 import { useUserManagement } from '@/hooks/useUserManagement';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
+import { Loader2, Home, Calendar, ClipboardList } from 'lucide-react';
 import { TripOverview } from '@/components/TripOverview';
 import { TripItinerary } from '@/components/TripItinerary';
 import { Tasks } from '@/components/Tasks';
-import { TripUpdateProvider } from '@/contexts/TripUpdateContext';
-import { Home, Calendar, ClipboardList } from 'lucide-react';
+import { PhoneAuth } from '@/components/PhoneAuth';
 
 interface TripPageClientProps {
   shareCode: string;
 }
 
 export function TripPageClient({ shareCode }: TripPageClientProps) {
-  const [trip, setTrip] = useState<TripWithTasks | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
+  const { userData } = useUserManagement();
+  const [trip, setTrip] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showPhoneAuth, setShowPhoneAuth] = useState(false);
-  const { userData, isLoading } = useUserManagement();
-
-  const fetchLatestTrip = async () => {
-    if (!shareCode) return;
-    
-    const tripRef = ref(database, `trips/${shareCode}`);
-    const snapshot = await get(tripRef);
-    
-    if (!snapshot.exists()) {
-      notFound();
-    }
-
-    setTrip(snapshot.val());
-  };
 
   useEffect(() => {
-    if (isLoading) return;
+    if (!shareCode) return;
 
-    if (!userData) {
-      setShowPhoneAuth(true);
-      return;
-    }
+    const tripRef = ref(database, `trips/${shareCode}`);
+    const unsubscribe = onValue(tripRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const tripData = snapshot.val();
+        // Ensure the trip has the shareCode
+        setTrip({ ...tripData, shareCode });
+      } else {
+        toast({
+          title: "Trip Not Found",
+          description: "The trip you're looking for doesn't exist.",
+          variant: "destructive",
+        });
+        router.push('/');
+      }
+      setIsLoading(false);
+    });
 
-    fetchLatestTrip();
-  }, [shareCode, userData, isLoading]);
+    return () => unsubscribe();
+  }, [shareCode, router, toast]);
 
-  // Show loading state while checking auth
+  const handleAuthSuccess = () => {
+    setShowPhoneAuth(false);
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-lg text-gray-600">Loading...</p>
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
 
-  // Show phone auth if not authenticated
-  if (showPhoneAuth || !userData) {
-    return (
-      <div className="max-w-md mx-auto p-6">
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-semibold">Verify Your Phone to View Trip</h2>
-          </CardHeader>
-          <CardContent>
-            <PhoneAuth onAuthSuccess={() => setShowPhoneAuth(false)} />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Show loading state while fetching trip
   if (!trip) {
+    return null;
+  }
+
+  if (!userData?.phoneNumber) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-lg text-gray-600">Loading trip details...</p>
-      </div>
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Verify Your Phone to View Trip</h2>
+        <PhoneAuth onAuthSuccess={handleAuthSuccess} />
+      </Card>
     );
   }
 
-  // Show trip details once authenticated
   return (
-    <div className="px-0 sm:px-6 max-w-2xl mx-auto">
-      <TripUpdateProvider onUpdate={fetchLatestTrip}>
-        <Tabs defaultValue="overview" className="space-y-6">
-          <div className="sticky top-0 bg-background border-b">
-            <div className="px-4 sm:px-0">
-              <TabsList className="w-full grid grid-cols-3 h-auto p-2">
-                <TabsTrigger value="overview" className="flex flex-col items-center gap-1 py-2 px-1">
-                  <Home className="h-5 w-5" />
-                  <span className="text-xs font-medium">Overview</span>
-                </TabsTrigger>
-                <TabsTrigger value="itinerary" className="flex flex-col items-center gap-1 py-2 px-1">
-                  <Calendar className="h-5 w-5" />
-                  <span className="text-xs font-medium">Itinerary</span>
-                </TabsTrigger>
-                <TabsTrigger value="tasks" className="flex flex-col items-center gap-1 py-2 px-1">
-                  <ClipboardList className="h-5 w-5" />
-                  <span className="text-xs font-medium">Tasks</span>
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
-          
-          <div className="px-6">
-            <TabsContent value="overview">
-              <TripOverview 
-                trip={trip} 
-                userPhone={userData.phoneNumber} 
-              />
-            </TabsContent>
-            
-            <TabsContent value="itinerary">
-              <TripItinerary trip={trip} />
-            </TabsContent>
+    <div className="space-y-6">
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="overview" className="flex flex-col items-center gap-1">
+            <Home className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="itinerary" className="flex flex-col items-center gap-1">
+            <Calendar className="h-4 w-4" />
+            Itinerary
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="flex flex-col items-center gap-1">
+            <ClipboardList className="h-4 w-4" />
+            Tasks
+          </TabsTrigger>
+        </TabsList>
 
-            <TabsContent value="tasks">
-              <Tasks trip={trip} />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </TripUpdateProvider>
+        <TabsContent value="overview">
+          <TripOverview trip={trip} />
+        </TabsContent>
+
+        <TabsContent value="itinerary">
+          <TripItinerary trip={trip} />
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <Tasks trip={trip} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 } 

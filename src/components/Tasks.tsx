@@ -8,6 +8,7 @@ import { useUserManagement } from '@/hooks/useUserManagement';
 import { ref, onValue, update } from 'firebase/database';
 import { database } from '@/lib/firebase/clientApp';
 import { v4 as uuidv4 } from 'uuid';
+import { useToast } from '@/hooks/use-toast';
 
 interface TasksProps {
   trip: TripWithTasks;
@@ -15,8 +16,12 @@ interface TasksProps {
 
 export function Tasks({ trip }: TasksProps) {
   const { userData } = useUserManagement();
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tripData, setTripData] = useState<TripWithTasks>(trip);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const isAdmin = !!(userData?.phoneNumber && tripData.admins?.[userData.phoneNumber]);
 
   useEffect(() => {
     if (!trip.shareCode) return;
@@ -24,74 +29,132 @@ export function Tasks({ trip }: TasksProps) {
     const tripRef = ref(database, `trips/${trip.shareCode}`);
     const unsubscribe = onValue(tripRef, (snapshot) => {
       if (snapshot.exists()) {
-        const updatedTripData = snapshot.val() as TripWithTasks;
-        setTripData(updatedTripData);
-        setTasks(updatedTripData.tasks ? Object.values(updatedTripData.tasks) : []);
+        const data = snapshot.val();
+        setTripData(data);
+        setTasks(data.tasks ? Object.values(data.tasks) : []);
       }
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, [trip.shareCode]);
 
-  const handleAddTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'createdBy'>) => {
-    if (!tripData || !userData) return;
+  const handleAddTask = async (task: Omit<Task, 'id' | 'createdAt' | 'createdBy'>) => {
+    if (!trip.shareCode || !userData?.phoneNumber) return;
 
+    const taskId = uuidv4();
     const newTask: Task = {
-      id: uuidv4(),
-      ...taskData,
+      id: taskId,
+      ...task,
       createdAt: new Date().toISOString(),
       createdBy: {
         phoneNumber: userData.phoneNumber,
-        name: userData.name,
+        name: userData.name || null,
       },
     };
 
-    const updates: Record<string, any> = {};
-    updates[`trips/${tripData.shareCode}/tasks/${newTask.id}`] = newTask;
-    await update(ref(database), updates);
+    try {
+      const updates: Record<string, any> = {};
+      updates[`trips/${trip.shareCode}/tasks/${taskId}`] = newTask;
+      await update(ref(database), updates);
+
+      toast({
+        title: "Task Added",
+        description: "The task has been added successfully.",
+      });
+    } catch (error) {
+      console.error('Error adding task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add task. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleToggleComplete = async (taskId: string) => {
-    if (!tripData) return;
+    if (!trip.shareCode || !userData?.phoneNumber) return;
 
-    const task = tripData.tasks?.[taskId];
+    const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    const updates: Record<string, any> = {};
-    updates[`trips/${tripData.shareCode}/tasks/${taskId}/completed`] = !task.completed;
-    await update(ref(database), updates);
+    // Only allow task completion by assignee or admin
+    if (!isAdmin && task.assignee?.phoneNumber !== userData.phoneNumber) {
+      toast({
+        title: "Permission Denied",
+        description: "Only the assigned person or an admin can mark this task as complete.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const updates: Record<string, any> = {};
+      updates[`trips/${trip.shareCode}/tasks/${taskId}/completed`] = !task.completed;
+      await update(ref(database), updates);
+
+      toast({
+        title: task.completed ? "Task Uncompleted" : "Task Completed",
+        description: `The task has been marked as ${task.completed ? 'incomplete' : 'complete'}.`,
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update task status. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  if (!userData) {
-    return <div>Loading...</div>;
-  }
+  const handleDeleteTask = async (taskId: string) => {
+    if (!trip.shareCode || !userData?.phoneNumber || !isAdmin) {
+      toast({
+        title: "Permission Denied",
+        description: "Only trip admins can delete tasks.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  // Get list of trip participants from RSVPs
-  const tripParticipants = Object.entries(tripData.rsvps || {})
-    .map(([phoneNumber, data]) => ({
-      phoneNumber,
-      name: data.name || null,
-      status: data.status,
-    }));
+    try {
+      const updates: Record<string, any> = {};
+      updates[`trips/${trip.shareCode}/tasks/${taskId}`] = null;
+      await update(ref(database), updates);
+
+      toast({
+        title: "Task Deleted",
+        description: "The task has been deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
       <AddTask
         onAddTask={handleAddTask}
-        tripParticipants={tripParticipants}
-        currentUser={{
-          phoneNumber: userData.phoneNumber,
-          name: userData.name,
-        }}
+        participants={Object.entries(tripData.rsvps || {}).map(([phoneNumber, data]) => ({
+          phoneNumber,
+          name: (data as { name: string | null }).name || null,
+        }))}
       />
 
       <TaskList
         tasks={tasks}
-        currentUser={{
-          phoneNumber: userData.phoneNumber,
-          name: userData.name,
-        }}
         onToggleComplete={handleToggleComplete}
+        onDeleteTask={handleDeleteTask}
+        currentUser={{
+          phoneNumber: userData?.phoneNumber || '',
+          name: userData?.name || null,
+        }}
+        isAdmin={isAdmin}
       />
     </div>
   );
