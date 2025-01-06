@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Task } from '@/types/task';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DatePicker } from '@/components/ui/date-picker';
+import { SimpleDatePicker } from '@/components/ui/simple-date-picker';
 import {
   Select,
   SelectContent,
@@ -85,7 +85,7 @@ export default function AddTask({ onAddTask, participants }: AddTaskProps) {
 
         <div className="space-y-2">
           <Label>Due Date</Label>
-          <DatePicker
+          <SimpleDatePicker
             date={dueDate}
             setDate={setDueDate}
           />

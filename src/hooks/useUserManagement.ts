@@ -15,13 +15,8 @@ export function useUserManagement() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[useUserManagement] Starting auth check...');
-    
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      console.log('[useUserManagement] Auth state changed:', user?.phoneNumber || 'no user');
-      
       if (!user) {
-        console.log('[useUserManagement] No user found, clearing state');
         setUserData(null);
         Cookies.remove('userData');
         setIsLoading(false);
@@ -33,16 +28,13 @@ export function useUserManagement() {
         const snapshot = await get(userRef);
         if (snapshot.exists()) {
           const fetchedUserData = snapshot.val();
-          console.log('[useUserManagement] Found user data:', fetchedUserData);
           setUserData(fetchedUserData);
           Cookies.set('userData', JSON.stringify(fetchedUserData));
         } else {
-          console.log('[useUserManagement] No user data found');
           setUserData(null);
           Cookies.remove('userData');
         }
       } catch (error) {
-        console.error('[useUserManagement] Error fetching user data:', error);
         setUserData(null);
         Cookies.remove('userData');
       }
@@ -50,7 +42,6 @@ export function useUserManagement() {
     });
 
     return () => {
-      console.log('[useUserManagement] Cleanup triggered');
       unsubscribe();
     };
   }, []);
@@ -94,7 +85,6 @@ export function useUserManagement() {
       window.location.href = '/';
       return true;
     } catch (error) {
-      console.error('Logout error:', error);
       throw error;
     }
   };

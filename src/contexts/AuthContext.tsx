@@ -28,10 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[AuthContext] Setting up auth listener');
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      console.log('[AuthContext] Auth state changed:', user?.phoneNumber || 'no user');
-      
       if (!user) {
         setUserData(null);
         setIsAuthLoading(false);
@@ -47,14 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserData(null);
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
         setUserData(null);
       }
       setIsAuthLoading(false);
     });
 
     return () => {
-      console.log('[AuthContext] Cleaning up auth listener');
       unsubscribe();
     };
   }, []);
@@ -95,7 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.location.href = '/';
       return true;
     } catch (error) {
-      console.error('Logout error:', error);
       throw error;
     }
   };

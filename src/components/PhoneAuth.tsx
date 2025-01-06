@@ -46,7 +46,11 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
           }
         });
       } catch (error) {
-        console.error('Error initializing reCAPTCHA:', error);
+        toast({
+          title: "Error",
+          description: "Failed to initialize authentication. Please try again.",
+          variant: "destructive",
+        });
       }
     }
 
@@ -56,7 +60,7 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
         try {
           recaptchaVerifierRef.current.clear();
         } catch (error) {
-          console.error('Error clearing reCAPTCHA:', error);
+          // Silently handle cleanup errors
         }
         recaptchaVerifierRef.current = null;
       }
@@ -100,14 +104,13 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
         description: "Please check your phone for the verification code.",
       });
     } catch (error: any) {
-      console.error('Error sending code:', error);
       // Clear the reCAPTCHA if there's an error
       if (recaptchaVerifierRef.current) {
         try {
           recaptchaVerifierRef.current.clear();
           recaptchaVerifierRef.current = null;
         } catch (clearError) {
-          console.error('Error clearing reCAPTCHA:', clearError);
+          // Silently handle cleanup errors
         }
       }
       toast({
@@ -144,7 +147,6 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
         handleAuthenticationSuccess();
       }
     } catch (error: any) {
-      console.error('Error verifying code:', error);
       toast({
         title: "Invalid code",
         description: "Please check the code and try again.",
@@ -170,7 +172,6 @@ export function PhoneAuth({ redirectPath, onAuthSuccess }: PhoneAuthProps) {
       await saveUserName(userName);
       handleAuthenticationSuccess();
     } catch (error: any) {
-      console.error('Error saving name:', error);
       toast({
         title: "Error saving name",
         description: "Please try again.",

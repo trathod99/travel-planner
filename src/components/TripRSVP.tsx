@@ -107,7 +107,6 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
         description: "Your RSVP has been saved successfully.",
       });
     } catch (error) {
-      console.error('Error updating RSVP:', error);
       toast({
         title: "Error",
         description: "Failed to update RSVP. Please try again.",
@@ -132,7 +131,6 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
         description: "The participant has been removed from the trip.",
       });
     } catch (error) {
-      console.error('Error removing participant:', error);
       toast({
         title: "Error",
         description: "Failed to remove participant. Please try again.",
@@ -178,7 +176,6 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
         description: `Successfully ${action === 'add' ? 'added' : 'removed'} admin role.`,
       });
     } catch (error) {
-      console.error('Error updating admin status:', error);
       toast({
         title: "Error",
         description: "Failed to update admin status. Please try again.",

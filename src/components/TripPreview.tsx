@@ -22,8 +22,6 @@ interface TripPreviewProps {
 }
 
 export function TripPreview({ trip, onSignInClick }: TripPreviewProps) {
-  console.log('[TripPreview] Rendering with data:', trip);
-
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
     try {
@@ -36,14 +34,6 @@ export function TripPreview({ trip, onSignInClick }: TripPreviewProps) {
   const adminNames = Object.values(trip.admins || {})
     .map(admin => admin.name || 'Unnamed Admin')
     .join(', ');
-
-  console.log('[TripPreview] Formatted data:', {
-    name: trip.name,
-    location: trip.location,
-    startDate: formatDate(trip.startDate),
-    endDate: formatDate(trip.endDate),
-    adminNames
-  });
 
   return (
     <Card className="max-w-2xl mx-auto">

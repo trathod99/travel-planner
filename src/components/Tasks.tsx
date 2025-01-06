@@ -63,7 +63,6 @@ export function Tasks({ trip }: TasksProps) {
         description: "The task has been added successfully.",
       });
     } catch (error) {
-      console.error('Error adding task:', error);
       toast({
         title: "Error",
         description: "Failed to add task. Please try again.",

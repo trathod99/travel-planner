@@ -39,17 +39,14 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
 
   // Fetch trip data
   useEffect(() => {
-    console.log('[TripPageClient] Fetching trip data');
     if (!shareCode) return;
 
     const tripRef = ref(database, `trips/${shareCode}`);
     const unsubscribe = onValue(tripRef, (snapshot) => {
       if (snapshot.exists()) {
         const tripData = snapshot.val();
-        console.log('[TripPageClient] Trip data loaded:', tripData);
         setTrip({ ...tripData, shareCode });
       } else {
-        console.log('[TripPageClient] Trip not found');
         toast({
           title: "Trip Not Found",
           description: "The trip you're looking for doesn't exist.",
@@ -65,7 +62,6 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
 
   // Handle successful authentication
   const handleAuthSuccess = () => {
-    console.log('[TripPageClient] Auth success, refreshing page...');
     window.location.reload();
   };
 
@@ -85,8 +81,6 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
   if (!trip) {
     return null;
   }
-
-  console.log('[TripPageClient] Rendering with auth state:', { isAuthenticated: !!userData });
 
   // Show preview for unauthenticated users
   if (!userData) {
@@ -113,7 +107,6 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
       );
     }
 
-    console.log('[TripPageClient] Showing preview:', previewData);
     return (
       <TripPreview 
         trip={previewData}
@@ -122,8 +115,6 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
     );
   }
 
-  console.log('[TripPageClient] Showing full trip view');
-  // Show full trip view for authenticated users
   return (
     <TripUpdateProvider onUpdate={fetchLatestTrip}>
       <div className="space-y-6">
