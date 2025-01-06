@@ -9,6 +9,7 @@ import { ref, onValue, update } from 'firebase/database';
 import { database } from '@/lib/firebase/clientApp';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
+import { recordActivity } from '@/lib/firebase/recordActivity';
 
 interface TasksProps {
   trip: TripWithTasks;
@@ -58,6 +59,17 @@ export function Tasks({ trip }: TasksProps) {
       updates[`trips/${trip.shareCode}/tasks/${taskId}`] = newTask;
       await update(ref(database), updates);
 
+      // Record the activity
+      await recordActivity({
+        tripId: trip.shareCode,
+        type: 'TASK_CREATE',
+        userId: userData.phoneNumber,
+        userName: userData.name,
+        details: {
+          taskName: newTask.title
+        }
+      });
+
       toast({
         title: "Task Added",
         description: "The task has been added successfully.",
@@ -88,9 +100,22 @@ export function Tasks({ trip }: TasksProps) {
     }
 
     try {
+      const newCompletedState = !task.completed;
       const updates: Record<string, any> = {};
-      updates[`trips/${trip.shareCode}/tasks/${taskId}/completed`] = !task.completed;
+      updates[`trips/${trip.shareCode}/tasks/${taskId}/completed`] = newCompletedState;
       await update(ref(database), updates);
+
+      // Record the activity
+      await recordActivity({
+        tripId: trip.shareCode,
+        type: 'TASK_COMPLETE',
+        userId: userData.phoneNumber,
+        userName: userData.name,
+        details: {
+          taskName: task.title,
+          completed: newCompletedState
+        }
+      });
 
       toast({
         title: task.completed ? "Task Uncompleted" : "Task Completed",

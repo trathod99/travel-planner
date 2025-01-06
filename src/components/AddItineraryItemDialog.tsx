@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUserManagement } from '@/hooks/useUserManagement';
+import { recordActivity } from '@/lib/firebase/recordActivity';
 
 interface AddItineraryItemDialogProps {
   selectedDate: Date;
@@ -379,6 +380,20 @@ export function AddItineraryItemDialog({
       await update(ref(database), {
         [itemPath]: itemData
       });
+
+      // Record activity if this is a new item
+      if (!editItem && userData) {
+        await recordActivity({
+          tripId,
+          type: 'ITINERARY_ADD',
+          userId: userData.phoneNumber,
+          userName: userData.name,
+          details: {
+            itemName: itemData.name,
+            itemDate: dateString
+          }
+        });
+      }
       
       await triggerUpdate(); // Trigger UI refresh
       onOpenChange(false);

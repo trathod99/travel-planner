@@ -13,6 +13,8 @@ import { useTripUpdate } from '@/contexts/TripUpdateContext';
 import { uploadFile } from '@/hooks/useFileUpload';
 import { processAttachment } from '@/lib/ai/processAttachment';
 import { deleteAttachment } from '@/lib/firebase/storage';
+import { useUserManagement } from '@/hooks/useUserManagement';
+import { recordActivity } from '@/lib/firebase/recordActivity';
 
 interface TripItineraryProps {
   trip: Trip;
@@ -26,6 +28,7 @@ interface PositionedItem extends ItineraryItem {
 }
 
 export function TripItinerary({ trip }: TripItineraryProps) {
+  const { userData } = useUserManagement();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(trip.startDate));
   const [addingForHour, setAddingForHour] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
@@ -112,6 +115,36 @@ export function TripItinerary({ trip }: TripItineraryProps) {
       
       await update(ref(database), updates);
       await triggerUpdate();
+      
+      // Record the activity
+      if (userData) {
+        console.log('Recording activity for new itinerary item:', {
+          tripId: trip.shareCode,
+          type: 'ITINERARY_ADD',
+          userId: userData.phoneNumber,
+          userName: userData.name,
+          details: {
+            itemName: newItem.name,
+            itemDate: dateString
+          }
+        });
+
+        await recordActivity({
+          tripId: trip.shareCode,
+          type: 'ITINERARY_ADD',
+          userId: userData.phoneNumber,
+          userName: userData.name,
+          details: {
+            itemName: newItem.name,
+            itemDate: dateString
+          }
+        });
+
+        console.log('Activity recorded successfully');
+      } else {
+        console.log('No user data available for recording activity');
+      }
+
       setAddingForHour(null);
       
       toast({
@@ -119,7 +152,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
         description: "Itinerary item has been added successfully.",
       });
     } catch (error) {
-      console.error('Error adding item:', error);
+      console.error('Error adding item or recording activity:', error);
       toast({
         title: "Error",
         description: "Failed to add item. Please try again.",

@@ -5,6 +5,7 @@ import { database } from '@/lib/firebase/clientApp';
 import { ref, update, onValue } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import { useUserManagement } from '@/hooks/useUserManagement';
+import { recordActivity } from '@/lib/firebase/recordActivity';
 import { Loader2, Shield, MoreVertical, UserMinus, ShieldCheck, ShieldX } from 'lucide-react';
 import {
   Select,
@@ -92,6 +93,7 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
   const handleRSVPChange = async (newStatus: RSVPStatus) => {
     setIsUpdating(true);
     try {
+      const oldStatus = rsvpStatus;
       const updates: Record<string, any> = {
         [`trips/${tripId}/rsvps/${userPhone}`]: {
           name: userData?.name || null,
@@ -100,6 +102,21 @@ export function TripRSVP({ tripId, userPhone }: TripRSVPProps) {
       };
 
       await update(ref(database), updates);
+      
+      // Record the activity
+      if (userData) {
+        await recordActivity({
+          tripId,
+          type: 'RSVP_CHANGE',
+          userId: userPhone,
+          userName: userData.name,
+          details: {
+            oldStatus: oldStatus || undefined,
+            newStatus,
+          }
+        });
+      }
+
       setRsvpStatus(newStatus);
       
       toast({

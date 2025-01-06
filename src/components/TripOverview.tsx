@@ -26,6 +26,7 @@ import {
 import { Task } from '@/types/task';
 import { CopyLink } from '@/components/CopyLink';
 import { Label } from '@/components/ui/label';
+import { recordActivity } from '@/lib/firebase/recordActivity';
 
 interface TripOverviewProps {
   trip: {
@@ -82,23 +83,80 @@ export function TripOverview({ trip }: TripOverviewProps) {
   }, [trip.id]);
 
   const handleSaveChanges = async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || !userData) return;
 
     setIsUpdating(true);
     try {
-      const updates: Record<string, any> = {
-        [`trips/${trip.id}/location`]: editedLocation || null,
-        [`trips/${trip.id}/startDate`]: editedStartDate?.toISOString() || null,
-        [`trips/${trip.id}/endDate`]: editedEndDate?.toISOString() || null,
-      };
+      const updates: Record<string, any> = {};
+      const activities = [];
 
-      await update(ref(database), updates);
-      setIsEditing(false);
-      
-      toast({
-        title: "Trip Updated",
-        description: "Trip details have been updated successfully.",
-      });
+      // Check for location change
+      if (trip.location !== editedLocation) {
+        updates[`trips/${trip.id}/location`] = editedLocation || null;
+        activities.push({
+          type: 'TRIP_UPDATE' as const,
+          details: {
+            field: 'location' as const,
+            oldValue: trip.location || '',
+            newValue: editedLocation || ''
+          }
+        });
+      }
+
+      // Check for start date change
+      const oldStartDate = trip.startDate;
+      const newStartDate = editedStartDate?.toISOString() || null;
+      if (oldStartDate !== newStartDate) {
+        updates[`trips/${trip.id}/startDate`] = newStartDate;
+        activities.push({
+          type: 'TRIP_UPDATE' as const,
+          details: {
+            field: 'startDate' as const,
+            oldValue: oldStartDate || '',
+            newValue: newStartDate || ''
+          }
+        });
+      }
+
+      // Check for end date change
+      const oldEndDate = trip.endDate;
+      const newEndDate = editedEndDate?.toISOString() || null;
+      if (oldEndDate !== newEndDate) {
+        updates[`trips/${trip.id}/endDate`] = newEndDate;
+        activities.push({
+          type: 'TRIP_UPDATE' as const,
+          details: {
+            field: 'endDate' as const,
+            oldValue: oldEndDate || '',
+            newValue: newEndDate || ''
+          }
+        });
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updates).length > 0) {
+        await update(ref(database), updates);
+
+        // Record activities
+        await Promise.all(activities.map(activity =>
+          recordActivity({
+            tripId: trip.id,
+            type: activity.type,
+            userId: userData.phoneNumber,
+            userName: userData.name,
+            details: activity.details
+          })
+        ));
+
+        setIsEditing(false);
+        
+        toast({
+          title: "Trip Updated",
+          description: "Trip details have been updated successfully.",
+        });
+      } else {
+        setIsEditing(false);
+      }
     } catch (error) {
       console.error('Error updating trip:', error);
       toast({

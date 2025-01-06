@@ -13,6 +13,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { recordActivity } from '@/lib/firebase/recordActivity';
 
 interface ItineraryItemCardProps {
   item: ItineraryItem;
@@ -69,10 +71,12 @@ export function ItineraryItemCard({ item, onEdit, tripId, dateString }: Itinerar
 
   const handleVote = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening edit dialog
-    if (!userPhone) return;
+    if (!userPhone || !userData) return;
 
     try {
       const votes = { ...(item.votes || {}) };
+      const isAddingVote = !votes[userPhone];
+      
       if (votes[userPhone]) {
         delete votes[userPhone];
       } else {
@@ -82,6 +86,19 @@ export function ItineraryItemCard({ item, onEdit, tripId, dateString }: Itinerar
       const updates: Record<string, any> = {};
       updates[`trips/${tripId}/itinerary/${dateString}/${item.id}/votes`] = votes;
       await update(ref(database), updates);
+      
+      // Record the activity
+      await recordActivity({
+        tripId,
+        type: 'ITINERARY_VOTE',
+        userId: userPhone,
+        userName: userData.name,
+        details: {
+          itemName: item.name,
+          voted: isAddingVote
+        }
+      });
+
       await triggerUpdate();
     } catch (error) {
       console.error('Error updating votes:', error);

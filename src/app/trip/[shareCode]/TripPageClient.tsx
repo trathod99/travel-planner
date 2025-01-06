@@ -8,13 +8,15 @@ import { useToast } from '@/hooks/use-toast';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
-import { Loader2, Home, Calendar, ClipboardList } from 'lucide-react';
+import { Loader2, Home, Calendar, ClipboardList, Activity } from 'lucide-react';
 import { TripOverview } from '@/components/TripOverview';
 import { TripItinerary } from '@/components/TripItinerary';
 import { Tasks } from '@/components/Tasks';
 import { PhoneAuth } from '@/components/PhoneAuth';
 import { TripPreview } from '@/components/TripPreview';
 import { TripUpdateProvider } from '@/contexts/TripUpdateContext';
+import { ActivityTimeline } from '@/components/ActivityTimeline';
+import { Activity as ActivityType } from '@/types/activity';
 
 interface TripPageClientProps {
   shareCode: string;
@@ -25,6 +27,7 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
   const { toast } = useToast();
   const { userData, isLoading: isAuthLoading } = useUserManagement();
   const [trip, setTrip] = useState<any>(null);
+  const [activities, setActivities] = useState<ActivityType[]>([]);
   const [isTripLoading, setIsTripLoading] = useState(true);
   const [showPhoneAuth, setShowPhoneAuth] = useState(false);
 
@@ -59,6 +62,28 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
 
     return () => unsubscribe();
   }, [shareCode, router, toast]);
+
+  // Fetch activities
+  useEffect(() => {
+    if (!shareCode) return;
+
+    const activitiesRef = ref(database, `trips/${shareCode}/activities`);
+    const unsubscribe = onValue(activitiesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const activitiesData = snapshot.val();
+        const activitiesList = Object.values(activitiesData) as ActivityType[];
+        // Sort by timestamp, most recent first
+        activitiesList.sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        setActivities(activitiesList);
+      } else {
+        setActivities([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [shareCode]);
 
   // Handle successful authentication
   const handleAuthSuccess = () => {
@@ -121,18 +146,22 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
         <Tabs defaultValue="overview" className="w-full">
           <div className="sticky top-0 w-full bg-background border-b sm:border-b-0 sm:mt-4">
             <div className="max-w-2xl mx-auto">
-              <TabsList className="w-full grid grid-cols-3 h-auto p-2">
+              <TabsList className="w-full grid grid-cols-4 h-auto p-2">
                 <TabsTrigger value="overview" className="flex flex-col items-center gap-1 py-2 px-1">
-                  <Home className="h-5 w-5" />
+                  <Home className="h-4 w-4" />
                   <span className="text-xs font-medium">Overview</span>
                 </TabsTrigger>
                 <TabsTrigger value="itinerary" className="flex flex-col items-center gap-1 py-2 px-1">
-                  <Calendar className="h-5 w-5" />
+                  <Calendar className="h-4 w-4" />
                   <span className="text-xs font-medium">Itinerary</span>
                 </TabsTrigger>
                 <TabsTrigger value="tasks" className="flex flex-col items-center gap-1 py-2 px-1">
-                  <ClipboardList className="h-5 w-5" />
+                  <ClipboardList className="h-4 w-4" />
                   <span className="text-xs font-medium">Tasks</span>
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="flex flex-col items-center gap-1 py-2 px-1">
+                  <Activity className="h-4 w-4" />
+                  <span className="text-xs font-medium">Activity</span>
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -149,6 +178,13 @@ export function TripPageClient({ shareCode }: TripPageClientProps) {
 
             <TabsContent value="tasks">
               <Tasks trip={trip} />
+            </TabsContent>
+
+            <TabsContent value="activity">
+              <div className="space-y-6">
+                <h1 className="text-2xl font-bold">Activity</h1>
+                <ActivityTimeline activities={activities} />
+              </div>
             </TabsContent>
           </div>
         </Tabs>
