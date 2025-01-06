@@ -1,0 +1,37 @@
+{
+  "rules": {
+    "trips": {
+      "$tripId": {
+        ".read": "!data.exists() || (data.child('name').exists() && data.child('location').exists() && data.child('startDate').exists() && data.child('endDate').exists() && data.child('admins').exists())",
+        ".write": "auth != null && (!data.exists() || data.child('admins').child(auth.token.phone_number).exists())",
+        "name": {
+          ".read": true
+        },
+        "location": {
+          ".read": true
+        },
+        "startDate": {
+          ".read": true
+        },
+        "endDate": {
+          ".read": true
+        },
+        "admins": {
+          ".read": true
+        },
+        "tasks": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.parent().exists() || data.parent().child('admins').child(auth.token.phone_number).exists())"
+        },
+        "itinerary": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.parent().exists() || data.parent().child('admins').child(auth.token.phone_number).exists())"
+        },
+        "rsvps": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    }
+  }
+} 

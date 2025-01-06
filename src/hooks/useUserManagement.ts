@@ -14,47 +14,44 @@ export function useUserManagement() {
   const [isNewUser, setIsNewUser] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing auth on mount
   useEffect(() => {
-    setIsLoading(true);
+    console.log('[useUserManagement] Starting auth check...');
     
-    // First check cookies
-    const savedUserData = Cookies.get('userData');
-    if (savedUserData) {
-      try {
-        const parsedUserData = JSON.parse(savedUserData);
-        setUserData(parsedUserData);
-      } catch (error) {
-        console.error('Error parsing saved user data:', error);
-        Cookies.remove('userData');
-      }
-    }
-
-    // Then listen for auth state changes
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      console.log('[useUserManagement] Auth state changed:', user?.phoneNumber || 'no user');
+      
       if (!user) {
+        console.log('[useUserManagement] No user found, clearing state');
         setUserData(null);
         Cookies.remove('userData');
-      } else if (!userData) {
-        // If we have auth but no userData, try to fetch it
-        try {
-          const userRef = ref(database, `users/${user.phoneNumber?.replace(/[^0-9]/g, '')}`);
-          const snapshot = await get(userRef);
-          if (snapshot.exists()) {
-            const fetchedUserData = snapshot.val();
-            setUserData(fetchedUserData);
-            Cookies.set('userData', JSON.stringify(fetchedUserData), { expires: 7 });
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const userRef = ref(database, `users/${user.phoneNumber?.replace(/[^0-9]/g, '')}`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          const fetchedUserData = snapshot.val();
+          console.log('[useUserManagement] Found user data:', fetchedUserData);
+          setUserData(fetchedUserData);
+          Cookies.set('userData', JSON.stringify(fetchedUserData));
+        } else {
+          console.log('[useUserManagement] No user data found');
+          setUserData(null);
+          Cookies.remove('userData');
         }
+      } catch (error) {
+        console.error('[useUserManagement] Error fetching user data:', error);
+        setUserData(null);
+        Cookies.remove('userData');
       }
       setIsLoading(false);
     });
 
     return () => {
+      console.log('[useUserManagement] Cleanup triggered');
       unsubscribe();
-      setIsLoading(false);
     };
   }, []);
 
@@ -65,7 +62,7 @@ export function useUserManagement() {
     if (snapshot.exists()) {
       const existingUser = snapshot.val();
       setUserData(existingUser);
-      Cookies.set('userData', JSON.stringify(existingUser), { expires: 7 });
+      Cookies.set('userData', JSON.stringify(existingUser));
       setIsNewUser(false);
       return existingUser;
     } else {
@@ -84,7 +81,7 @@ export function useUserManagement() {
     const userRef = ref(database, `users/${formattedPhone}`);
     await set(userRef, newUser);
     setUserData(newUser);
-    Cookies.set('userData', JSON.stringify(newUser), { expires: 7 });
+    Cookies.set('userData', JSON.stringify(newUser));
     return newUser;
   };
 
@@ -110,7 +107,7 @@ export function useUserManagement() {
     const updatedUser = { ...userData, name };
     await set(userRef, updatedUser);
     setUserData(updatedUser);
-    Cookies.set('userData', JSON.stringify(updatedUser), { expires: 7 });
+    Cookies.set('userData', JSON.stringify(updatedUser));
   };
 
   return {
