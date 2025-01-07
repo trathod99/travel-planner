@@ -16,8 +16,9 @@ import { deleteAttachment } from '@/lib/firebase/storage';
 import { useUserManagement } from '@/hooks/useUserManagement';
 import { recordActivity } from '@/lib/firebase/recordActivity';
 
-interface TripItineraryProps {
+export interface TripItineraryProps {
   trip: Trip;
+  onUpdate: (trip: Trip) => void;
 }
 
 interface PositionedItem extends ItineraryItem {
@@ -27,7 +28,7 @@ interface PositionedItem extends ItineraryItem {
   totalColumns: number;
 }
 
-export function TripItinerary({ trip }: TripItineraryProps) {
+export function TripItinerary({ trip, onUpdate }: TripItineraryProps) {
   const { userData } = useUserManagement();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(trip.startDate));
   const [addingForHour, setAddingForHour] = useState<number | null>(null);
