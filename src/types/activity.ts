@@ -4,7 +4,8 @@ export type ActivityType =
   | 'ITINERARY_VOTE'
   | 'TRIP_UPDATE'
   | 'TASK_CREATE'
-  | 'TASK_COMPLETE';
+  | 'TASK_COMPLETE'
+  | 'IMAGE_UPDATE';
 
 export interface Activity {
   id: string;

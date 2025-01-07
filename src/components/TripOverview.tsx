@@ -27,14 +27,17 @@ import { Task } from '@/types/task';
 import { CopyLink } from '@/components/CopyLink';
 import { Label } from '@/components/ui/label';
 import { recordActivity } from '@/lib/firebase/recordActivity';
+import { TripImage } from '@/components/TripImage';
 
 interface TripOverviewProps {
   trip: {
     id: string;
+    shareCode: string;
     name: string;
     location: string | null;
     startDate: string | null;
     endDate: string | null;
+    createdAt: string;
     createdBy: {
       phoneNumber: string;
       name: string | null;
@@ -47,6 +50,15 @@ interface TripOverviewProps {
         name: string | null;
       };
     }>;
+    image?: {
+      url: string;
+      path: string;
+      uploadedBy: {
+        phoneNumber: string;
+        name: string | null;
+      };
+      uploadedAt: string;
+    };
   };
 }
 
@@ -268,6 +280,11 @@ export function TripOverview({ trip }: TripOverviewProps) {
 
   return (
     <div className="space-y-6">
+      <TripImage
+        trip={trip}
+        isAdmin={isAdmin}
+        userData={userData}
+      />
       {isEditing ? (
         <div className="space-y-4">
           <div className="space-y-2">

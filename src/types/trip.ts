@@ -23,9 +23,9 @@ export interface ItineraryItem {
 export interface Trip {
   id: string;
   name: string;
-  location: string;
-  startDate: string;
-  endDate: string;
+  location: string | null;
+  startDate: string | null; // ISO string
+  endDate: string | null; // ISO string
   description?: string;
   createdAt: string;
   shareCode: string;
@@ -46,4 +46,17 @@ export interface Trip {
     name: string | null;
     status: 'going' | 'maybe' | 'not_going';
   }>; // phoneNumber -> RSVP data
+  image?: {
+    url: string;
+    path: string; // Storage path for deletion
+    uploadedBy: {
+      phoneNumber: string;
+      name: string | null;
+    };
+    uploadedAt: string; // ISO string
+    credit?: {
+      name: string;
+      link: string;
+    };
+  };
 } 

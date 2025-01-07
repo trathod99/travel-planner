@@ -45,6 +45,9 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
       case 'TASK_COMPLETE':
         return `${userName} ${activity.details.completed ? 'completed' : 'uncompleted'} task: ${activity.details.taskName}`;
 
+      case 'IMAGE_UPDATE':
+        return `${userName} updated the trip image`;
+
       default:
         return 'Unknown activity';
     }
